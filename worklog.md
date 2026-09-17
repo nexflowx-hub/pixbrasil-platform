@@ -40,3 +40,16 @@ Stage Summary:
 - Landing 100% fiel à maquete no desktop 1672x941, responsiva em todos os viewports de teste
 - Screenshots de verificação em screenshots/: FINAL-full-1672, FINAL-1440-top, FINAL-1024-top, tablet-768-final, mobile-390-final
 - Lint limpo, console sem erros, menu mobile e âncoras funcionando
+
+---
+Task ID: 13
+Agent: main (Z.ai Code)
+Task: Push para GitHub (nexflowx-hub/pixbrasil-platform)
+
+Work Log:
+- Commit local criado com toda a implementação (branch main)
+- Push BLOQUEADO: o token ghp_qYoD... fornecido retorna 401 Bad Credentials (inválido/revogado/expirado)
+- Necessário: novo Personal Access Token com scope "repo" para concluir o push
+
+Stage Summary:
+- Pendente apenas o push; repo local pronto com 2 commits (implementação + limpeza)
