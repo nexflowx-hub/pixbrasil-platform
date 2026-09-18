@@ -32,3 +32,12 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+
+      - name: Upload visual audit screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-audit-${{ github.sha }}
+          path: test-results/**/landing-audit.png
+          if-no-files-found: warn
+          retention-days: 5

@@ -113,3 +113,12 @@ test("health endpoint e web-only", async ({ request }) => {
     status: "ONLINE",
   });
 });
+
+test("captura visual da landing para auditoria responsiva", async ({ page }, testInfo) => {
+  await page.goto("/");
+  await page.screenshot({
+    path: testInfo.outputPath("landing-audit.png"),
+    fullPage: true,
+    animations: "disabled",
+  });
+});
