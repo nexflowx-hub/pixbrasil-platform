@@ -19,6 +19,7 @@ export interface RoutingContext {
   currency: "BRL";
   paymentMethod: "PIX";
   riskLevel?: string;
+  environment?: "SANDBOX" | "PRODUCTION";
   policyId?: string;
   policyVersion?: number;
 }
@@ -26,19 +27,31 @@ export interface RoutingContext {
 export interface RouteCandidate {
   connectionId: string;
   providerCode: string;
+  providerAccountId?: string;
+  providerStatus?: "ACTIVE" | "DEGRADED" | "DISABLED";
+  providerAccountStatus?: "ACTIVE" | "DEGRADED" | "DISABLED";
+  connectionStatus?: "ACTIVE" | "DEGRADED" | "DISABLED";
+  environment?: "SANDBOX" | "PRODUCTION";
+  supportsPixBrl?: boolean;
   priority: number;
   weight: number;
   minAmount?: number;
   maxAmount?: number;
   allowedTiers?: string[];
   allowedAccountTypes?: RoutingAccountType[];
+  allowedRiskLevels?: string[];
+  requiredTags?: string[];
+  tags?: string[];
   dailyVolumeCap?: number;
   dailyVolumeAssigned?: number;
   monthlyVolumeCap?: number;
   monthlyVolumeAssigned?: number;
   health: "HEALTHY" | "DEGRADED" | "DOWN" | "UNKNOWN";
   successRate?: number;
+  errorRate?: number;
+  maxErrorRate?: number;
   p95LatencyMs?: number;
+  maxP95LatencyMs?: number;
   costBps?: number;
   fixedCost?: number;
   enabled: boolean;
@@ -210,10 +223,45 @@ export function evaluateRouting(
   for (const candidate of candidates) {
     let reason: string | undefined;
 
-    if (!candidate.enabled) {
+    if (!candidate.enabled || candidate.connectionStatus === "DISABLED") {
       reason = "CONNECTION_DISABLED";
+    } else if (candidate.providerStatus === "DISABLED") {
+      reason = "PROVIDER_DISABLED";
+    } else if (candidate.providerAccountStatus === "DISABLED") {
+      reason = "PROVIDER_ACCOUNT_DISABLED";
+    } else if (candidate.supportsPixBrl === false) {
+      reason = "CAPABILITY_NOT_SUPPORTED";
+    } else if (
+      context.environment &&
+      candidate.environment &&
+      context.environment !== candidate.environment
+    ) {
+      reason = "ENVIRONMENT_MISMATCH";
     } else if (candidate.health === "DOWN") {
       reason = "PROVIDER_DOWN";
+    } else if (
+      candidate.maxErrorRate != null &&
+      candidate.errorRate != null &&
+      candidate.errorRate > candidate.maxErrorRate
+    ) {
+      reason = "ERROR_RATE_LIMIT";
+    } else if (
+      candidate.maxP95LatencyMs != null &&
+      candidate.p95LatencyMs != null &&
+      candidate.p95LatencyMs > candidate.maxP95LatencyMs
+    ) {
+      reason = "LATENCY_LIMIT";
+    } else if (
+      context.riskLevel &&
+      candidate.allowedRiskLevels?.length &&
+      !candidate.allowedRiskLevels.includes(context.riskLevel)
+    ) {
+      reason = "RISK_LEVEL_NOT_ALLOWED";
+    } else if (
+      candidate.requiredTags?.length &&
+      !candidate.requiredTags.every((tag) => candidate.tags?.includes(tag))
+    ) {
+      reason = "REQUIRED_TAG_MISSING";
     } else if (
       candidate.minAmount != null &&
       context.amount < candidate.minAmount
