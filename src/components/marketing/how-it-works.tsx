@@ -20,7 +20,7 @@ const STEPS = [
 export function HowItWorks() {
   return (
     <section id="como-funciona" aria-label="Como funciona" className="relative z-10 mx-auto w-full max-w-[1640px] px-5 pt-8 sm:px-8 xl:px-12">
-      <div className="grid gap-6 2xl:grid-cols-[264px_minmax(0,1fr)_190px] 2xl:items-center">
+      <div className="grid gap-6 xl:grid-cols-[220px_minmax(0,1fr)_160px] xl:items-center">
         <div>
           <p className="text-[10.5px] font-bold uppercase tracking-[0.28em] text-pix">Como funciona</p>
           <h2 className="mt-2 text-[22px] font-bold leading-[1.12] tracking-[-0.03em] text-cream xl:text-[24px]">
@@ -54,7 +54,7 @@ export function HowItWorks() {
         </div>
 
         <p
-          className="font-script justify-self-center -rotate-3 text-center text-[26px] font-semibold leading-[1.05] text-transparent 2xl:justify-self-end"
+          className="font-script justify-self-center -rotate-3 text-center text-[26px] font-semibold leading-[1.05] text-transparent xl:justify-self-end"
           style={{ backgroundImage:"linear-gradient(100deg,#E7C569 0%,#D2A34E 55%,#8FE8C2 100%)", WebkitBackgroundClip:"text", backgroundClip:"text" }}
           aria-label="Mesmo valor. Mais possibilidades."
         >

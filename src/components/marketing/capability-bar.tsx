@@ -23,12 +23,12 @@ export function CapabilityBar() {
       aria-label="Capacidades da plataforma"
       className="relative z-10 mx-auto w-full max-w-[1640px] px-5 sm:px-8 xl:px-12"
     >
-      <div className="glass-panel grid auto-rows-fr grid-cols-1 gap-2 rounded-[18px] p-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      <div className="glass-panel grid auto-rows-fr grid-cols-1 gap-2 rounded-[18px] p-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {ITEMS.map((item) => (
           <article
             key={item.title}
             data-layout-guard="capability-card"
-            className="card-hover flex min-h-[88px] min-w-0 items-start gap-3 overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-4 2xl:min-h-[82px] 2xl:items-center"
+            className="card-hover flex min-h-[88px] min-w-0 items-start gap-3 overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-4 xl:min-h-[96px] xl:items-center"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-pix/25 bg-pix/[0.08]">
               <item.icon className="h-[17px] w-[17px] text-pix" aria-hidden="true" />

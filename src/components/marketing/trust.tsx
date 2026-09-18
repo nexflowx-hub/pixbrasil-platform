@@ -41,7 +41,7 @@ export function Trust() {
           </p>
         </div>
 
-        <ul className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
+        <ul className="grid auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {FEATURES.map((feature) => (
             <li key={feature.title} data-layout-guard="trust-card" className="flex min-h-[92px] items-start gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3.5">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-pix/25 bg-pix/[0.07]">
