@@ -1,67 +1,40 @@
-# PiXBrasil.org — Landing Page
+# PiXBrasil.org
 
-> **Seu dinheiro sem fronteiras.**
-> Entrada via PIX. Liquidação digital. Controle total.
+Frontend público do **PiXBrasil.org**, atualmente em fase de pré-lançamento.
 
-Landing page oficial do **PiXBrasil.org**, reproduzindo com fidelidade máxima a maquete visual de referência. Fintech premium + blockchain + identidade brasileira.
-
-![Referência visual](public/images/og-cover.png)
+## Estado atual
+- Landing pública em Next.js App Router
+- Personal e Business apresentados como produtos em desenvolvimento
+- Nenhuma operação financeira pública ativa
+- Backend, Financial Core, providers e settlement ainda não ligados a este frontend
 
 ## Stack
+- Next.js 16.3.5 (Active LTS)
+- React 19
+- TypeScript strict
+- Tailwind CSS 4
+- Playwright
+- Vercel (frontend)
 
-- **Next.js 16** (App Router, React 19, Server Components)
-- **TypeScript 5** strict
-- **Tailwind CSS 4** + CSS Variables (design tokens dark-first)
-- **Lucide React** icons
-- **next/font** (Inter + Caveat)
-- **next/image** com otimização
-
-## Destaques de implementação
-
-- **Device mockups reais em React/CSS** — smartphone e laptop com dashboards vivos (não são imagens), nítidos, responsivos e prontos para evoluir para o produto real
-- **Mapa do Brasil digital em SVG** — dot-matrix cartography com nodes dourados pulsantes, mesh de conexões e arcos orbitais animados
-- **Ambient background cinematográfico** — gradient mesh, arcos emerald/cyan, partículas, grid e film grain, tudo respeitando `prefers-reduced-motion`
-- **Horizonte da Terra** com glow ciano e city lights em CSS puro
-- **Escala fluida da cena do hero** por breakpoints (o smartphone nunca cobre o copy)
-- **SEO completo** — metadata, OpenGraph, Twitter Card, JSON-LD (Organization + WebSite), sitemap, robots, canonical, hreflang-preparado
-- **PWA-ready** — manifest, ícones (any + maskable), apple-touch-icon
-- **Security headers** — nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy
-
-## Estrutura
-
-```
-src/
-  app/
-    layout.tsx        # Fontes, metadata SEO, JSON-LD
-    page.tsx          # Composição da landing
-    globals.css       # Design tokens + animações + utilities
-    sitemap.ts
-  components/
-    brand/            # Logo, bandeira do Brasil
-    marketing/        # header, hero, capability-bar, how-it-works, audiences, trust, footer
-    devices/          # phone-mockup, dashboard-mockup, balance-chart, hero-device-scene
-    visuals/          # brazil-network (SVG), ambient-background
-  components/ui/      # shadcn/ui
-public/
-  images/             # Assets cinematográficos (Rio, SP, skyline, OG)
-  icons/              # PWA icons
-```
-
-## Desenvolvimento
-
+## Quality gates
 ```bash
-bun install
-bun run dev        # http://localhost:3000
-bun run lint
+npm install
+npm run typecheck
+npm run lint
+npm run build
+npm run test:e2e
 ```
 
-## Roadmap do produto
+## Segurança
+- CSP e security headers
+- nenhum formulário financeiro fictício
+- PWA cacheia apenas assets públicos
+- API, HTML e dados financeiros não são cacheados
+- /api/health é o único endpoint local público nesta fase
 
-A arquitetura de componentes já considera a evolução para o ecossistema completo:
-
-- **Personal (PF)** — conta pessoal, entrada PIX, wallets, ativos, conversão, saída BRL/cripto
-- **Business (PJ)** — merchant, stores, API PIX, payment links, checkout, webhooks, analytics, RBAC, settlements
-
----
-
-**PiXBrasil.org** — Brasil para o mundo. 🇧🇷
+## Deploy
+1. CI verde
+2. Vercel Preview
+3. auditoria visual/responsiva
+4. Lighthouse/console
+5. promoção para produção

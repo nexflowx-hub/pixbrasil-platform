@@ -1,12 +1,17 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/config/site";
+
+const PUBLIC_ROUTES = [
+  "/","/personal","/business","/pricing","/how-it-works","/support","/early-access",
+  "/legal/terms","/legal/privacy","/legal/cookies","/legal/risk-disclosure",
+  "/legal/regulatory-status","/legal/aml-kyc","/legal/acceptable-use"
+];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return [
-    {
-      url: "https://pixbrasil.org",
-      lastModified: new Date(),
-      changeFrequency: "weekly",
-      priority: 1,
-    },
-  ];
+  return PUBLIC_ROUTES.map((route) => ({
+    url: `${SITE_URL}${route === "/" ? "" : route}`,
+    lastModified: new Date(),
+    changeFrequency: route === "/" ? "weekly" : "monthly",
+    priority: route === "/" ? 1 : 0.6
+  }));
 }

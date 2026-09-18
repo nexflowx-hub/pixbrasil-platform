@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Caveat } from "next/font/google";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
+import { PwaRegister } from "@/components/pwa-register";
+import { SITE_URL, siteConfig } from "@/config/site";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -15,8 +16,6 @@ const caveat = Caveat({
   weight: ["500", "600", "700"],
   display: "swap",
 });
-
-const SITE_URL = "https://pixbrasil.org";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -38,7 +37,7 @@ export const metadata: Metadata = {
     "API PIX",
     "links de pagamento",
   ],
-  authors: [{ name: "PiXBrasil.org" }],
+  authors: [{ name: siteConfig.name }],
   creator: "PiXBrasil.org",
   publisher: "PiXBrasil.org",
   alternates: {
@@ -103,8 +102,8 @@ export const viewport: Viewport = {
 const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "PiXBrasil.org",
-  alternateName: "PiXBrasil",
+  name: siteConfig.name,
+  alternateName: siteConfig.shortName,
   url: SITE_URL,
   logo: `${SITE_URL}/icons/icon-512.png`,
   slogan: "Seu dinheiro sem fronteiras",
@@ -112,23 +111,18 @@ const organizationJsonLd = {
     "Receba via PIX, mantenha seus recursos em ativos digitais e escolha como utilizar ou sacar. Soluções para pessoas e empresas.",
   areaServed: { "@type": "Country", name: "Brasil" },
   knowsAbout: ["PIX", "Ativos digitais", "Blockchain", "Pagamentos"],
-  contactPoint: {
-    "@type": "ContactPoint",
-    contactType: "customer support",
-    availableLanguage: ["Portuguese"],
-  },
 };
 
 const websiteJsonLd = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "PiXBrasil.org",
-  alternateName: "PiXBrasil",
+  name: siteConfig.name,
+  alternateName: siteConfig.shortName,
   url: SITE_URL,
   inLanguage: "pt-BR",
   publisher: {
     "@type": "Organization",
-    name: "PiXBrasil.org",
+    name: siteConfig.name,
   },
 };
 
@@ -149,7 +143,7 @@ export default function RootLayout({
           }}
         />
         {children}
-        <Toaster />
+        <PwaRegister />
       </body>
     </html>
   );

@@ -75,7 +75,7 @@ export function HowItWorks() {
             Simples para você. Poderoso para o seu negócio.
           </p>
           <Link
-            href="#"
+            href="/how-it-works"
             className="group mt-3 inline-flex items-center gap-2 rounded-full border border-pix/35 bg-pix/[0.08] px-3.5 py-2 text-[11px] font-medium text-cream transition-all duration-200 hover:border-pix/60 hover:bg-pix/15"
           >
             Conheça todos os detalhes

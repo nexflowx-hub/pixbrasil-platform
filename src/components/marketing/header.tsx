@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, Menu, X } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import { BrandLogo, BrazilFlag } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 
@@ -11,22 +11,22 @@ const NAV_ITEMS = [
     label: "Para Você",
     href: "#para-voce",
     dropdown: [
-      { label: "Conta pessoal", href: "#para-voce" },
-      { label: "Carteira multiativos", href: "#para-voce" },
-      { label: "Saques via PIX ou cripto", href: "#como-funciona" },
+      { label: "Conta pessoal", href: "/personal" },
+      { label: "Carteira multiativos", href: "/personal" },
+      { label: "Saques via PIX ou cripto", href: "/how-it-works" },
     ],
   },
   {
     label: "Empresas",
     href: "#empresas",
     dropdown: [
-      { label: "Conta empresarial", href: "#empresas" },
-      { label: "API PIX", href: "#tarifas" },
-      { label: "Links de pagamento", href: "#tarifas" },
+      { label: "Conta empresarial", href: "/business" },
+      { label: "API PIX", href: "/business" },
+      { label: "Links de pagamento", href: "/business" },
     ],
   },
-  { label: "Como Funciona", href: "#como-funciona" },
-  { label: "Tarifas", href: "#tarifas" },
+  { label: "Como Funciona", href: "/how-it-works" },
+  { label: "Tarifas", href: "/pricing" },
   { label: "Segurança", href: "#seguranca" },
 ] as const;
 
@@ -87,23 +87,15 @@ export function SiteHeader() {
 
         {/* Right — actions */}
         <div className="flex items-center gap-3 sm:gap-4">
-          <button
-            type="button"
-            aria-label="Pesquisar"
-            className="hidden h-9 w-9 items-center justify-center rounded-full text-mist transition-colors hover:bg-white/5 hover:text-white xl:flex"
-          >
-            <Search className="h-[18px] w-[18px]" aria-hidden="true" />
-          </button>
-
           <Link
-            href="#"
+            href="/login"
             className="hidden h-9 items-center whitespace-nowrap rounded-full border border-white/15 px-5 text-[13px] font-medium text-cream transition-all duration-200 hover:border-pix/50 hover:bg-pix/10 sm:flex"
           >
             Entrar
           </Link>
 
           <Link
-            href="#"
+            href="/early-access"
             className="btn-cta hidden h-9 items-center whitespace-nowrap rounded-full px-5 text-[13px] font-semibold sm:flex"
           >
             Criar conta
@@ -165,14 +157,14 @@ export function SiteHeader() {
           ))}
           <div className="mt-4 flex flex-col gap-3">
             <Link
-              href="#"
+              href="/login"
               onClick={close}
               className="btn-outline-green flex h-11 items-center justify-center rounded-full text-[14px] font-medium"
             >
               Entrar
             </Link>
             <Link
-              href="#"
+              href="/early-access"
               onClick={close}
               className="btn-cta flex h-11 items-center justify-center rounded-full text-[14px] font-semibold"
             >

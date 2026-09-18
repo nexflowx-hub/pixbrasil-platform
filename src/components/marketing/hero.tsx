@@ -125,7 +125,7 @@ export function HeroSection() {
             style={{ animationDelay: "0.52s" }}
           >
             <Link
-              href="#"
+              href="/early-access"
               className="btn-cta group flex h-[46px] items-center justify-center gap-2.5 whitespace-nowrap rounded-full px-7 text-[14.5px] font-bold"
             >
               Abrir conta
@@ -135,7 +135,7 @@ export function HeroSection() {
               />
             </Link>
             <Link
-              href="#empresas"
+              href="/business"
               className="btn-outline-green flex h-[46px] items-center justify-center whitespace-nowrap rounded-full px-7 text-[14px] font-medium"
             >
               Ver solução empresarial

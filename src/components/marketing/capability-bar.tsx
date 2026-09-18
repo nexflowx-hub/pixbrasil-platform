@@ -46,7 +46,7 @@ const ITEMS = [
 export function CapabilityBar() {
   return (
     <section
-      id="tarifas"
+      id="recursos"
       aria-label="Capacidades da plataforma"
       className="relative z-10 mx-auto w-full max-w-[1640px] px-5 sm:px-8 xl:px-12"
     >

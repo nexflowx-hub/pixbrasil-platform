@@ -3,13 +3,13 @@ import { ChevronDown, Globe } from "lucide-react";
 import { BrandLogo } from "@/components/brand/logo";
 
 const LINKS = [
-  "Sobre nós",
-  "Carreiras",
-  "Blog",
-  "Central de Ajuda",
-  "Termos de Uso",
-  "Política de Privacidade",
-  "Compliance",
+  { label: "Como funciona", href: "/how-it-works" },
+  { label: "Para Você", href: "/personal" },
+  { label: "Empresas", href: "/business" },
+  { label: "Central de Ajuda", href: "/support" },
+  { label: "Termos de Uso", href: "/legal/terms" },
+  { label: "Política de Privacidade", href: "/legal/privacy" },
+  { label: "Compliance", href: "/legal/regulatory-status" },
 ];
 
 function LinkedInIcon({ className }: { className?: string }) {
@@ -69,15 +69,15 @@ export function SiteFooter() {
         <nav aria-label="Links do rodapé">
           <ul className="flex flex-wrap items-center gap-x-0 gap-y-2 text-[12px] text-mist">
             {LINKS.map((link, i) => (
-              <li key={link} className="flex items-center">
+              <li key={link.href} className="flex items-center">
                 {i > 0 && (
                   <span aria-hidden="true" className="mx-3 h-3 w-px bg-white/12" />
                 )}
                 <Link
-                  href="#"
+                  href={link.href}
                   className="transition-colors duration-200 hover:text-white"
                 >
-                  {link}
+                  {link.label}
                 </Link>
               </li>
             ))}
@@ -89,13 +89,14 @@ export function SiteFooter() {
           <ul className="flex items-center gap-4" aria-label="Redes sociais">
             {SOCIALS.map((social) => (
               <li key={social.label}>
-                <a
-                  href="#"
-                  aria-label={social.label}
-                  className="flex h-7 w-7 items-center justify-center text-mist transition-all duration-200 hover:-translate-y-0.5 hover:text-white"
+                <span
+                  role="img"
+                  aria-label={`${social.label} — canal em preparação`}
+                  title={`${social.label} — em preparação`}
+                  className="flex h-7 w-7 items-center justify-center text-dim"
                 >
                   <social.icon className="h-[15px] w-[15px]" />
-                </a>
+                </span>
               </li>
             ))}
           </ul>
@@ -109,15 +110,14 @@ export function SiteFooter() {
             Brasil para o mundo.
           </p>
 
-          <button
-            type="button"
-            className="flex items-center gap-1.5 rounded-full border border-white/12 px-3 py-1.5 text-[12px] text-mist transition-colors hover:border-pix/40 hover:text-white"
-            aria-label="Selecionar idioma. Idioma atual: português do Brasil"
+          <span
+            className="flex items-center gap-1.5 rounded-full border border-white/12 px-3 py-1.5 text-[12px] text-mist"
+            aria-label="Idioma atual: português do Brasil"
           >
             <Globe className="h-3.5 w-3.5" aria-hidden="true" />
             PT-BR
             <ChevronDown className="h-3 w-3" aria-hidden="true" />
-          </button>
+          </span>
         </div>
       </div>
     </footer>
