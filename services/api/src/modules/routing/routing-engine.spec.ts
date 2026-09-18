@@ -19,8 +19,6 @@ function route(
   patch: Partial<RouteCandidate> & Pick<RouteCandidate, "connectionId" | "providerCode">,
 ): RouteCandidate {
   return {
-    connectionId: patch.connectionId,
-    providerCode: patch.providerCode,
     priority: 100,
     weight: 1,
     health: "HEALTHY",
