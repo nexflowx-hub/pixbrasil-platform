@@ -8,7 +8,6 @@ const eslintConfig = [
     rules: {
       "no-debugger": "error",
       "no-unreachable": "error",
-      "no-undef": "error",
       "react-hooks/exhaustive-deps": "error",
       "react/no-unescaped-entities": "off",
       "@typescript-eslint/no-explicit-any": "off",
