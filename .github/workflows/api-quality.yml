@@ -12,7 +12,7 @@ on:
       - ".github/workflows/api-quality.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   api:
@@ -28,13 +28,18 @@ jobs:
           node-version: "22"
           package-manager-cache: false
       - run: npm install --no-audit --no-fund
-      - name: Upload API lockfile
-        uses: actions/upload-artifact@v7
-        with:
-          name: api-npm-lockfile
-          path: services/api/package-lock.json
-          if-no-files-found: error
-          retention-days: 3
+      - name: Commit API lockfile on foundation branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/core-routing-foundation'
+        run: |
+          if git diff --quiet -- package-lock.json && git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
+            echo "API package-lock already synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(api): lock dependency graph"
+          git push
       - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm run build
