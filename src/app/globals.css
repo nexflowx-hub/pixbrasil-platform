@@ -494,3 +494,23 @@
     scroll-behavior: auto;
   }
 }
+
+
+/* ── PWA / responsive hardening ───────────────────────── */
+html {
+  background: #02090b;
+}
+body {
+  min-width: 320px;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+[data-layout-card] {
+  overflow-wrap: anywhere;
+}

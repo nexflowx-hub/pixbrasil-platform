@@ -21,3 +21,46 @@ test("health endpoint e web-only", async ({ request }) => {
   expect(response.ok()).toBeTruthy();
   expect(await response.json()).toMatchObject({ success: true, service: "PiXBrasil Web", component: "landing", status: "ONLINE" });
 });
+
+
+test("cards nao apresentam overflow textual nos breakpoints auditados", async ({ page }) => {
+  await page.goto("/");
+
+  const failures = await page.locator("[data-layout-card]").evaluateAll((cards) =>
+    cards.flatMap((card, cardIndex) => {
+      const nodes = [card, ...Array.from(card.querySelectorAll("p,span,li,h2,h3"))];
+      return nodes
+        .filter((node) => {
+          const el = node as HTMLElement;
+          const style = window.getComputedStyle(el);
+          if (style.overflowX === "auto" || style.overflowX === "scroll") return false;
+          return el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2;
+        })
+        .map((node) => ({
+          cardIndex,
+          tag: node.tagName,
+          text: (node.textContent || "").trim().slice(0, 120),
+          clientWidth: (node as HTMLElement).clientWidth,
+          scrollWidth: (node as HTMLElement).scrollWidth,
+        }));
+    })
+  );
+
+  expect(failures).toEqual([]);
+});
+
+
+test("PWA possui manifest, service worker e offline shell", async ({ page, request }) => {
+  const manifest = await request.get("/manifest.webmanifest");
+  expect(manifest.ok()).toBeTruthy();
+  const body = await manifest.json();
+  expect(body.display).toBe("standalone");
+  expect(body.icons.length).toBeGreaterThanOrEqual(3);
+
+  expect((await request.get("/sw.js")).ok()).toBeTruthy();
+  expect((await request.get("/offline")).ok()).toBeTruthy();
+
+  await page.goto("/");
+  const manifestHref = await page.locator('link[rel="manifest"]').getAttribute("href");
+  expect(manifestHref).toBeTruthy();
+});

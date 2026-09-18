@@ -62,9 +62,9 @@ export function HowItWorks() {
       aria-label="Como funciona"
       className="relative z-10 mx-auto w-full max-w-[1640px] px-5 pt-8 sm:px-8 xl:px-12"
     >
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-center">
+      <div className="flex flex-col gap-6 2xl:flex-row 2xl:items-center">
         {/* Intro */}
-        <div className="shrink-0 xl:w-[264px]">
+        <div className="shrink-0 2xl:w-[264px]">
           <p className="text-[10.5px] font-bold uppercase tracking-[0.28em] text-pix">
             Como funciona
           </p>
@@ -87,7 +87,7 @@ export function HowItWorks() {
         </div>
 
         {/* Steps — desktop horizontal */}
-        <div className="hidden min-w-0 flex-1 items-center gap-2 lg:flex">
+        <div className="hidden min-w-0 flex-1 items-center gap-2 2xl:flex">
           {STEPS.map((step, i) => (
             <div key={step.title} className="flex min-w-0 items-center gap-2">
               <StepCard step={step} />
@@ -102,7 +102,7 @@ export function HowItWorks() {
         </div>
 
         {/* Steps — tablet 2x2 / mobile vertical */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:hidden">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 2xl:hidden">
           {STEPS.map((step, i) => (
             <div key={step.title}>
               <StepCard step={step} />
@@ -118,7 +118,7 @@ export function HowItWorks() {
 
         {/* Handwritten flourish */}
         <p
-          className="font-script shrink-0 -rotate-3 text-center text-[26px] font-semibold leading-[1.05] text-transparent xl:w-[190px]"
+          className="font-script shrink-0 -rotate-3 text-center text-[26px] font-semibold leading-[1.05] text-transparent 2xl:w-[190px]"
           style={{
             backgroundImage:
               "linear-gradient(100deg, #E7C569 0%, #D2A34E 55%, #8FE8C2 100%)",
@@ -142,7 +142,7 @@ function StepCard({
   step: (typeof STEPS)[number];
 }) {
   return (
-    <div className="card-hover glass-panel flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-4 py-3.5">
+    <div className="card-hover glass-panel flex min-h-[84px] min-w-0 flex-1 items-center gap-3 rounded-2xl px-4 py-3.5" data-layout-card="flow-step">
       <step.icon className="h-10 w-10 shrink-0 text-pix" aria-hidden="true" />
       <div className="min-w-0">
         <p className="text-[14px] font-bold leading-tight text-cream">

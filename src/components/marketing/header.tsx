@@ -44,13 +44,13 @@ export function SiteHeader() {
           aria-label="PiXBrasil.org — página inicial"
           className="shrink-0"
         >
-          <BrandLogo tagline className="text-[21px]" />
+          <BrandLogo tagline className="text-[19px] sm:text-[20px]" taglineClassName="hidden sm:block" />
         </Link>
 
         {/* Center — navigation */}
         <nav
           aria-label="Navegação principal"
-          className="hidden items-center gap-5 lg:flex xl:gap-7"
+          className="hidden items-center gap-5 xl:flex xl:gap-7"
         >
           {NAV_ITEMS.map((item) => (
             <div key={item.label} className="group relative">
@@ -103,13 +103,13 @@ export function SiteHeader() {
 
           <span
             aria-hidden="true"
-            className="hidden h-5 w-px bg-white/12 lg:block"
+            className="hidden h-5 w-px bg-white/12 xl:block"
           />
 
           <button
             type="button"
             aria-label="Idioma: português do Brasil"
-            className="hidden items-center gap-2 rounded-full px-1 py-1 transition-colors hover:bg-white/5 lg:flex"
+            className="hidden items-center gap-2 rounded-full px-1 py-1 transition-colors hover:bg-white/5 xl:flex"
           >
             <BrazilFlag />
             <span className="text-[12.5px] font-medium text-cream">BR</span>
@@ -121,7 +121,7 @@ export function SiteHeader() {
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
             aria-label={open ? "Fechar menu" : "Abrir menu"}
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-cream transition-colors hover:bg-white/5 lg:hidden"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-cream transition-colors hover:bg-white/5 xl:hidden"
           >
             {open ? (
               <X className="h-5 w-5" aria-hidden="true" />
@@ -135,7 +135,7 @@ export function SiteHeader() {
       {/* Mobile drawer */}
       <div
         className={cn(
-          "fixed inset-x-0 top-16 z-40 origin-top border-b border-[rgba(51,207,177,0.16)] bg-[rgba(1,10,12,0.96)] backdrop-blur-2xl transition-all duration-300 lg:hidden",
+          "fixed inset-x-0 top-16 z-40 origin-top border-b border-[rgba(51,207,177,0.16)] bg-[rgba(1,10,12,0.96)] backdrop-blur-2xl transition-all duration-300 xl:hidden",
           open
             ? "visible translate-y-0 opacity-100"
             : "invisible -translate-y-3 opacity-0"

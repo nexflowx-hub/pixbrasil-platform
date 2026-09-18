@@ -27,12 +27,12 @@ export function Audiences() {
       {/* ── Para Você ── */}
       <article
         id="para-voce"
-        className="card-hover group relative flex min-h-[168px] flex-col overflow-hidden rounded-2xl border border-[rgba(43,231,181,0.4)] bg-[linear-gradient(110deg,rgba(3,22,24,0.97),rgba(5,24,27,0.72))] p-5"
+        data-layout-card="audience" className="card-hover group relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-[rgba(43,231,181,0.4)] bg-[linear-gradient(110deg,rgba(3,22,24,0.97),rgba(5,24,27,0.72))] p-5"
       >
         {/* Rio image — right half, masked */}
         <div
           aria-hidden="true"
-          className="absolute inset-y-0 right-0 w-[52%] sm:w-[46%]"
+          className="absolute inset-0 opacity-35 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[46%] sm:opacity-100"
         >
           <Image
             src="/images/rio-sunset.png"
@@ -64,12 +64,12 @@ export function Audiences() {
           </div>
         </div>
 
-        <p className="relative mt-3 max-w-[440px] text-[12.5px] leading-[1.55] text-mist">
+        <p className="relative mt-3 max-w-[640px] text-[12.5px] leading-[1.55] text-mist sm:max-w-[64%]">
           Receba em PIX, mantenha seus ativos digitais em Liquid e TRON e
           saque quando quiser. Tudo em um só lugar, com total controle.
         </p>
 
-        <ul className="relative mt-4 flex flex-wrap gap-x-5 gap-y-2">
+        <ul className="relative mt-4 grid max-w-full grid-cols-1 gap-x-4 gap-y-2 pr-12 sm:max-w-[68%] sm:grid-cols-2 sm:pr-0">
           {BENEFITS_PERSONAL.map((benefit) => (
             <li
               key={benefit}
@@ -95,12 +95,12 @@ export function Audiences() {
       {/* ── Para Empresas ── */}
       <article
         id="empresas"
-        className="card-hover group relative flex min-h-[168px] flex-col overflow-hidden rounded-2xl border border-[rgba(43,231,181,0.4)] bg-[linear-gradient(110deg,rgba(3,22,24,0.97),rgba(5,24,27,0.72))] p-5"
+        data-layout-card="audience" className="card-hover group relative flex min-h-[220px] flex-col overflow-hidden rounded-2xl border border-[rgba(43,231,181,0.4)] bg-[linear-gradient(110deg,rgba(3,22,24,0.97),rgba(5,24,27,0.72))] p-5"
       >
         {/* São Paulo image — right half, masked */}
         <div
           aria-hidden="true"
-          className="absolute inset-y-0 right-0 w-[52%] sm:w-[46%]"
+          className="absolute inset-0 opacity-35 sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[46%] sm:opacity-100"
         >
           <Image
             src="/images/sao-paulo-night.png"
@@ -132,13 +132,13 @@ export function Audiences() {
           </div>
         </div>
 
-        <p className="relative mt-3 max-w-[440px] text-[12.5px] leading-[1.55] text-mist">
+        <p className="relative mt-3 max-w-[640px] text-[12.5px] leading-[1.55] text-mist sm:max-w-[64%]">
           Receba pagamentos via PIX, utilize nossa API, crie links de
           pagamento, mantenha liquidez em ativos digitais e escale com
           segurança.
         </p>
 
-        <ul className="relative mt-4 flex flex-wrap gap-x-5 gap-y-2">
+        <ul className="relative mt-4 grid max-w-full grid-cols-1 gap-x-4 gap-y-2 pr-12 sm:max-w-[68%] sm:grid-cols-2 sm:pr-0">
           {BENEFITS_BUSINESS.map((benefit) => (
             <li
               key={benefit}
@@ -153,7 +153,7 @@ export function Audiences() {
           ))}
         </ul>
 
-        <p className="absolute right-4 top-1/2 hidden -translate-y-1/2 text-right text-[9.5px] font-bold uppercase leading-[1.7] tracking-[0.14em] text-white/95 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_18px_rgba(2,9,11,0.8)] lg:block">
+        <p className="absolute right-4 top-1/2 hidden -translate-y-1/2 text-right 2xl:block text-[9.5px] font-bold uppercase leading-[1.7] tracking-[0.14em] text-white/95 [text-shadow:0_2px_12px_rgba(0,0,0,0.9),0_0_18px_rgba(2,9,11,0.8)] ">
           Empresas
           <br />
           que constroem

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Caveat } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/pwa-register";
+import { PwaInstallPrompt } from "@/components/pwa-install-prompt";
 import { SITE_URL, siteConfig } from "@/config/site";
 
 const inter = Inter({
@@ -144,6 +145,7 @@ export default function RootLayout({
         />
         {children}
         <PwaRegister />
+        <PwaInstallPrompt />
       </body>
     </html>
   );
