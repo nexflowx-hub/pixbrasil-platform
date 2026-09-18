@@ -1,0 +1,24 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { InfoPage } from "@/components/marketing/info-page";
+
+const UPDATED = "17 de setembro de 2026";
+const PAGES = {
+  terms: { title: "Termos de Uso", description: "A landing PiXBrasil.org apresenta um produto em desenvolvimento. Nenhuma funcionalidade financeira descrita deve ser interpretada como disponível antes da sua ativação expressa no aplicativo e da publicação dos termos operacionais correspondentes.", bullets: ["Não enviar valores para endereços, chaves ou terceiros com base apenas em material promocional.","Recursos futuros poderão depender de providers, limites, elegibilidade e revisões de risco.","As condições comerciais definitivas serão apresentadas antes da contratação."] },
+  privacy: { title: "Política de Privacidade", description: "Nesta fase pública, o site é predominantemente informativo. Dados técnicos podem ser processados pelo hosting para segurança, disponibilidade e prevenção de abuso. O onboarding futuro terá política específica antes da coleta de dados pessoais.", bullets: ["Minimização de dados como princípio de arquitetura.","Dados financeiros não serão armazenados no frontend público.","Secrets e credenciais operacionais não serão expostos ao navegador.","A política será atualizada antes da ativação do onboarding."] },
+  cookies: { title: "Política de Cookies", description: "A versão atual não depende de cookies publicitários para funcionar. Cookies essenciais poderão ser utilizados futuramente para sessão, segurança e preferências quando essas funcionalidades forem ativadas.", bullets: ["Sem necessidade de cookies de marketing para a landing atual.","Cookies de sessão serão classificados como essenciais quando o login for lançado.","Mecanismos de consentimento serão adicionados caso categorias opcionais sejam introduzidas."] },
+  "risk-disclosure": { title: "Divulgação de Riscos", description: "Ativos digitais e transferências blockchain possuem riscos próprios, incluindo volatilidade, congestionamento de rede, erro de endereço, indisponibilidade de provider e irreversibilidade de certas transferências.", bullets: ["Valor exibido em BRL pode representar apenas uma estimativa de mercado.","Rede e ativo de destino devem ser verificados antes de um withdrawal.","Custos e tempos de confirmação variam conforme a rede.","Disponibilidade de conversão e saída não é garantida em todos os momentos."] },
+  "regulatory-status": { title: "Status Regulatório", description: "PiXBrasil.org está em desenvolvimento. A publicação desta landing não representa, por si só, autorização para captar depósitos, prestar serviço bancário, custodiar ativos de terceiros ou operar diretamente como participante do PIX.", bullets: ["Funcionalidades reguladas permanecerão bloqueadas até a estrutura aplicável estar concluída.","Rails de entrada e saída poderão depender de instituições e providers terceiros.","O produto distinguirá claramente infraestrutura própria de serviços prestados por parceiros."] },
+  "aml-kyc": { title: "AML / KYC", description: "Quando o produto entrar em operação, controles de identidade, risco, prevenção a fraude e monitoramento serão aplicados de forma proporcional ao produto, à conta e aos serviços habilitados.", bullets: ["Controles serão integrados ao onboarding e às operações relevantes.","Perfis Personal e Business poderão possuir requisitos diferentes.","Eventos de risco e decisões operacionais serão auditáveis internamente."] },
+  "acceptable-use": { title: "Uso Aceitável", description: "O PiXBrasil não será destinado a fraude, furto, lavagem de dinheiro, financiamento de atividades ilícitas, abuso de terceiros, exploração ou tentativa de contornar controles de segurança e obrigações aplicáveis.", bullets: ["Contas e operações poderão ser suspensas diante de risco ou abuso.","Automação e API deverão respeitar limites e regras publicadas.","Tentativas de acesso não autorizado poderão ser registradas e bloqueadas."] }
+} as const;
+type LegalSlug = keyof typeof PAGES;
+export function generateStaticParams() { return Object.keys(PAGES).map((slug) => ({ slug })); }
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params; const page = PAGES[slug as LegalSlug]; if (!page) return {};
+  return { title: page.title, description: page.description };
+}
+export default async function LegalPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params; const page = PAGES[slug as LegalSlug]; if (!page) notFound();
+  return <InfoPage eyebrow={`Legal · Atualizado em ${UPDATED}`} title={page.title} description={page.description} bullets={page.bullets} />;
+}
