@@ -14,13 +14,12 @@ services:
       PORT: "8080"
       RUNTIME_STRICT: "true"
       REDIS_URL: redis://pixbrasil-redis:6379
-    ports:
-      - "127.0.0.1:8085:8080"
     depends_on:
       pixbrasil-redis:
         condition: service_healthy
     networks:
       - pixbrasil-internal
+      - platform-edge
     read_only: true
     tmpfs:
       - /tmp
@@ -62,6 +61,9 @@ services:
 networks:
   pixbrasil-internal:
     name: pixbrasil-internal
+  platform-edge:
+    external: true
+    name: platform_edge
 
 volumes:
   pixbrasil-redis-data:
