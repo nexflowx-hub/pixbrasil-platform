@@ -12,7 +12,7 @@ on:
       - ".github/workflows/api-quality.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   api:
@@ -27,19 +27,8 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
-      - run: npm install --no-audit --no-fund
-      - name: Commit API lockfile on foundation branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/core-routing-foundation'
-        run: |
-          if git diff --quiet -- package-lock.json && git ls-files --error-unmatch package-lock.json >/dev/null 2>&1; then
-            echo "API package-lock already synchronized"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore(api): lock dependency graph"
-          git push
+      - run: npm ci --no-audit --no-fund
       - run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm run build
+      - run: npm test
