@@ -29,8 +29,11 @@ export function PwaInstallPrompt() {
   const ios = useMemo(() => isIosDevice(), []);
 
   useEffect(() => {
-    setInstalled(isStandalone());
-    setDismissed(sessionStorage.getItem("pixbrasil-install-dismissed") === "1");
+    const bootstrapTimer = window.setTimeout(() => {
+      setInstalled(isStandalone());
+      const wasDismissed = sessionStorage.getItem("pixbrasil-install-dismissed") === "1";
+      setDismissed(wasDismissed);
+    }, 0);
 
     const timer = window.setTimeout(() => {
       if (sessionStorage.getItem("pixbrasil-install-dismissed") !== "1") {
@@ -51,6 +54,7 @@ export function PwaInstallPrompt() {
     window.addEventListener("appinstalled", onInstalled);
 
     return () => {
+      window.clearTimeout(bootstrapTimer);
       window.clearTimeout(timer);
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
       window.removeEventListener("appinstalled", onInstalled);
