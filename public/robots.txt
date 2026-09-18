@@ -1,16 +1,1 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: *
-Allow: /
-
-Sitemap: https://pixbrasil.org/sitemap.xml
+User-agent: *\nAllow: /\nDisallow: /login\nDisallow: /api/\n\nSitemap: https://pixbrasil.org/sitemap.xml\n

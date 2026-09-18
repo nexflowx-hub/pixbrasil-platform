@@ -1,7 +1,7 @@
 {
   "name": "PiXBrasil.org — Seu dinheiro sem fronteiras",
   "short_name": "PiXBrasil",
-  "description": "Receba via PIX, mantenha seus recursos em ativos digitais e escolha como utilizar ou sacar.",
+  "description": "Experiência brasileira para PIX e ativos digitais, atualmente em fase de pré-lançamento.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -13,29 +13,9 @@
   "dir": "ltr",
   "categories": ["finance", "business"],
   "icons": [
-    {
-      "src": "/icons/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
-    }
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
