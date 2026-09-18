@@ -1,29 +1,26 @@
-import { Controller, Get } from "@nestjs/common";
+import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
+import { RuntimeHealthService } from "./runtime-health.service";
 
 @Controller("health")
 export class HealthController {
+  constructor(private readonly runtimeHealth: RuntimeHealthService) {}
+
   @Get()
   health() {
     return {
       success: true,
       service: "PiXBrasil",
       component: "api",
-      version: "0.1.0",
+      version: "0.2.0",
       status: "ONLINE",
       timestamp: new Date().toISOString(),
     };
   }
 
   @Get("ready")
-  ready() {
-    return {
-      success: true,
-      service: "PiXBrasil",
-      component: "api",
-      status: "STARTING_FOUNDATION",
-      database: "NOT_CONNECTED",
-      redis: "NOT_CONNECTED",
-      timestamp: new Date().toISOString(),
-    };
+  async ready() {
+    const snapshot = await this.runtimeHealth.snapshot();
+    if (!snapshot.success) throw new ServiceUnavailableException(snapshot);
+    return snapshot;
   }
 }

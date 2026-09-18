@@ -1,0 +1,68 @@
+name: pixbrasil-core
+
+services:
+  pixbrasil-api:
+    build:
+      context: ../../services/api
+      dockerfile: Dockerfile
+    container_name: pixbrasil-api
+    restart: unless-stopped
+    env_file:
+      - /etc/pixbrasil/api.env
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      RUNTIME_STRICT: "true"
+      REDIS_URL: redis://pixbrasil-redis:6379
+    ports:
+      - "127.0.0.1:8085:8080"
+    depends_on:
+      pixbrasil-redis:
+        condition: service_healthy
+    networks:
+      - pixbrasil-internal
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  pixbrasil-redis:
+    image: redis:7.4-alpine
+    container_name: pixbrasil-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+    volumes:
+      - pixbrasil-redis-data:/data
+    networks:
+      - pixbrasil-internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+networks:
+  pixbrasil-internal:
+    name: pixbrasil-internal
+
+volumes:
+  pixbrasil-redis-data:
+    name: pixbrasil-redis-data

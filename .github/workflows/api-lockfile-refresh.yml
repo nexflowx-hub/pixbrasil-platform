@@ -1,0 +1,46 @@
+name: API Lockfile Refresh
+
+on:
+  push:
+    branches: ["feat/backend-runtime-v0-2"]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: services/api
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/backend-runtime-v0-2
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
+      - run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - name: Build runtime image
+        working-directory: .
+        run: docker build -f services/api/Dockerfile services/api
+      - name: Commit synchronized lockfile
+        working-directory: .
+        run: |
+          if git diff --quiet -- services/api/package-lock.json; then
+            echo "Lockfile already synchronized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add services/api/package-lock.json
+          git commit -m "chore(api): refresh runtime lockfile"
+          git push origin HEAD:feat/backend-runtime-v0-2
