@@ -1,4 +1,4 @@
 api.pixbrasil.org {
   encode zstd gzip
-  reverse_proxy 127.0.0.1:8085
+  reverse_proxy pixbrasil-api:8080
 }
