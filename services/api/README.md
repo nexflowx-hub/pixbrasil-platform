@@ -27,6 +27,10 @@ Readiness is only `READY` when PostgreSQL is reachable, the private
 When `RUNTIME_STRICT=true`, startup fails immediately if `DATABASE_URL` or
 `REDIS_URL` is missing.
 
+Applied Atlas Financial Core / Control Plane schema changes are versioned under
+`db/core/`; product-specific PiXBrasil migrations remain under
+`db/pixbrasil/`.
+
 No provider is activated by this runtime work. PixGo and MisticPay remain
 disabled until provider accounts, Vault credentials, gateway connections and
 SHADOW routing are explicitly configured.
