@@ -1,9 +1,17 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { AppModule } from "./app.module";
+import { assertRuntimeConfiguration } from "./config/runtime-env";
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  assertRuntimeConfiguration();
+
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
+
+  app.set("trust proxy", 1);
   app.setGlobalPrefix("api");
   app.enableShutdownHooks();
 
