@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "start": "node dist/main.js",
-    "test": "npm run build && node --test \"dist/modules/routing/*.spec.js\" \"dist/modules/providers/*.spec.js\" \"dist/modules/payments/*.spec.js\""
+    "test": "npm run build && node --test \"dist/modules/auth/*.spec.js\" \"dist/modules/routing/*.spec.js\" \"dist/modules/providers/*.spec.js\" \"dist/modules/payments/*.spec.js\""
   },
   "engines": { "node": ">=22 <25" },
   "dependencies": {
