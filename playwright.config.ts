@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test";
+import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -10,7 +10,7 @@ export default defineConfig({
   projects: [
     { name: "desktop-1440", use: { viewport: { width: 1440, height: 900 } } },
     { name: "tablet-768", use: { viewport: { width: 768, height: 1024 } } },
-    { name: "mobile-390", use: { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } } }
+    { name: "mobile-390", use: { browserName: "chromium", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 } }
   ],
   webServer: { command: "npm run start", url: "http://127.0.0.1:3000", reuseExistingServer: !process.env.CI, timeout: 120_000 }
 });
