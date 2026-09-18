@@ -27,6 +27,7 @@ export function CapabilityBar() {
         {ITEMS.map((item, i) => (
           <div
             key={item.title}
+            data-layout-guard="capability-card"
             className={[
               "card-hover flex min-h-[76px] min-w-[238px] snap-start items-start gap-3 px-4 py-4",
               "xl:min-w-0 xl:items-center",

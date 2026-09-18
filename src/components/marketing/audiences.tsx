@@ -44,6 +44,7 @@ function AudienceCard({
   return (
     <article
       id={id}
+      data-layout-guard="audience-card"
       className="card-hover group relative flex min-h-[255px] flex-col overflow-hidden rounded-2xl border border-[rgba(43,231,181,0.4)] bg-[linear-gradient(110deg,rgba(3,22,24,0.98),rgba(5,24,27,0.76))] p-5 sm:min-h-[238px] sm:p-6"
     >
       <div aria-hidden="true" className="absolute inset-y-0 right-0 w-full sm:w-[48%] lg:w-[44%]">
