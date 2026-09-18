@@ -74,9 +74,9 @@ export function Trust() {
       aria-label="Segurança e confiança"
       className="relative z-10 mx-auto w-full max-w-[1640px] px-5 pt-9 sm:px-8 xl:px-12"
     >
-      <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:gap-10">
+      <div className="flex flex-col gap-6 2xl:flex-row 2xl:items-center 2xl:gap-10">
         {/* Label */}
-        <div className="shrink-0 xl:w-[236px]">
+        <div className="shrink-0 2xl:w-[236px]">
           <p className="text-[10.5px] font-bold uppercase tracking-[0.28em] text-pix">
             Confiança
           </p>
@@ -90,9 +90,9 @@ export function Trust() {
         </div>
 
         {/* Features */}
-        <ul className="grid min-w-0 flex-1 grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+        <ul className="grid min-w-0 flex-1 grid-cols-1 gap-5 sm:grid-cols-2 2xl:grid-cols-4">
           {FEATURES.map((feature) => (
-            <li key={feature.title} className="flex items-start gap-3">
+            <li key={feature.title} data-layout-card="trust-feature" className="flex min-w-0 items-start gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-pix/25 bg-pix/[0.07]">
                 <feature.icon
                   className="h-5 w-5 text-pix"
@@ -112,13 +112,13 @@ export function Trust() {
         </ul>
 
         {/* Gold seal */}
-        <div className="hidden xl:block">
+        <div className="hidden 2xl:block">
           <TrustSeal />
         </div>
       </div>
 
       {/* Seal on smaller screens */}
-      <div className="mt-6 flex justify-center xl:hidden">
+      <div className="mt-6 flex justify-center 2xl:hidden">
         <TrustSeal />
       </div>
     </section>

@@ -3,15 +3,20 @@
   "short_name": "PiXBrasil",
   "description": "Experiência brasileira para PIX e ativos digitais, atualmente em fase de pré-lançamento.",
   "id": "/",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
   "background_color": "#02090B",
   "theme_color": "#02090B",
   "lang": "pt-BR",
   "dir": "ltr",
   "categories": ["finance", "business"],
+  "shortcuts": [
+    { "name": "Para Você", "short_name": "Pessoal", "url": "/personal", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Para Empresas", "short_name": "Empresas", "url": "/business", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ],
   "icons": [
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
