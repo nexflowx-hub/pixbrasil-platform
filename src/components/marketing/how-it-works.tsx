@@ -70,8 +70,8 @@ function StepCard({ step }: { step: (typeof STEPS)[number] }) {
     <div data-layout-guard="flow-card" className="card-hover glass-panel flex h-full min-h-[96px] min-w-0 items-start gap-3 rounded-2xl px-4 py-4">
       <step.icon className="h-9 w-9 shrink-0 text-pix" aria-hidden="true" />
       <div className="min-w-0">
-        <p className="text-[13.5px] font-bold leading-tight text-cream">{step.number}. {step.title}</p>
-        <p className="mt-1.5 text-[11px] leading-[1.38] text-dim">{step.description}</p>
+        <p data-text-safe className="text-[13.5px] font-bold leading-tight text-cream">{step.number}. {step.title}</p>
+        <p data-text-safe className="mt-1.5 text-[11px] leading-[1.38] text-dim">{step.description}</p>
       </div>
     </div>
   );

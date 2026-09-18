@@ -26,7 +26,33 @@ test("cards criticos nao deixam texto escapar do container", async ({ page }) =>
           text: node.innerText.replace(/\s+/g, " ").trim().slice(0, 120),
         };
       })
-      .filter((entry) => entry.widthOverflow > 2),
+      .filter((entry) => entry.widthOverflow > 2 || entry.heightOverflow > 2),
+  );
+
+  expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
+});
+
+test("conteudo textual dos cards permanece dentro dos limites visuais", async ({ page }) => {
+  await page.goto("/");
+
+  const issues = await page.locator("[data-layout-guard]").evaluateAll((cards) =>
+    cards.flatMap((card) => {
+      const cardRect = card.getBoundingClientRect();
+      return Array.from(card.querySelectorAll("[data-text-safe]"))
+        .filter((node) => (node.textContent ?? "").trim().length > 0)
+        .map((node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            kind: (card as HTMLElement).dataset.layoutGuard ?? "unknown",
+            text: (node.textContent ?? "").trim().slice(0, 100),
+            left: rect.left - cardRect.left,
+            right: rect.right - cardRect.right,
+            top: rect.top - cardRect.top,
+            bottom: rect.bottom - cardRect.bottom,
+          };
+        })
+        .filter((entry) => entry.left < -2 || entry.right > 2 || entry.top < -2 || entry.bottom > 2);
+    }),
   );
 
   expect(issues, JSON.stringify(issues, null, 2)).toEqual([]);
@@ -41,6 +67,7 @@ test("PWA manifest e service worker estao publicamente disponiveis", async ({ re
     short_name: "PiXBrasil",
     display: "standalone",
     scope: "/",
+    start_url: "/app?source=pwa",
   });
   expect(Array.isArray(manifest.icons)).toBeTruthy();
   expect(manifest.icons.length).toBeGreaterThanOrEqual(3);
@@ -51,6 +78,13 @@ test("PWA manifest e service worker estao publicamente disponiveis", async ({ re
   expect(sw).toContain("pixbrasil-public-v1");
   expect(sw).toContain("/icons/");
   expect(sw).not.toContain('url.pathname.startsWith("/api/")');
+});
+
+test("app demo instalado abre em rota dedicada e sem operacoes reais", async ({ page }) => {
+  const response = await page.goto("/app?source=pwa");
+  expect(response?.ok()).toBeTruthy();
+  await expect(page.getByText("Modo demonstração")).toBeVisible();
+  await expect(page.getByText(/operações financeiras desativadas/i)).toBeVisible();
 });
 
 test("rotas publicas e legais essenciais respondem", async ({ page }) => {

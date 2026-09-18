@@ -23,14 +23,14 @@ export function CapabilityBar() {
       aria-label="Capacidades da plataforma"
       className="relative z-10 mx-auto w-full max-w-[1640px] px-5 sm:px-8 xl:px-12"
     >
-      <div className="glass-panel scrollbar-hide flex snap-x snap-mandatory overflow-x-auto rounded-[18px] xl:grid xl:grid-cols-6 xl:overflow-visible">
+      <div className="glass-panel scrollbar-hide flex snap-x snap-mandatory overflow-x-auto rounded-[18px] 2xl:grid 2xl:grid-cols-6 2xl:overflow-visible">
         {ITEMS.map((item, i) => (
           <div
             key={item.title}
             data-layout-guard="capability-card"
             className={[
               "card-hover flex min-h-[76px] min-w-[238px] snap-start items-start gap-3 px-4 py-4",
-              "xl:min-w-0 xl:items-center",
+              "2xl:min-w-0 2xl:items-center",
               i > 0 ? "border-l border-[rgba(58,211,182,0.14)]" : "",
             ].join(" ")}
           >
@@ -38,10 +38,10 @@ export function CapabilityBar() {
               <item.icon className="h-[17px] w-[17px] text-pix" aria-hidden="true" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[12.5px] font-semibold leading-[1.22] text-cream xl:text-[13px]">
+              <span data-text-safe className="block text-[12.5px] font-semibold leading-[1.22] text-cream 2xl:text-[13px]">
                 {item.title}
               </span>
-              <span className="mt-1 block text-[10.5px] leading-[1.35] text-dim xl:text-[11px]">
+              <span data-text-safe className="mt-1 block text-[10.5px] leading-[1.35] text-dim 2xl:text-[11px]">
                 {item.description}
               </span>
             </span>

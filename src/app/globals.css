@@ -494,3 +494,23 @@
     scroll-behavior: auto;
   }
 }
+
+/* ── Layout safety / responsive card system ───────────────── */
+[data-layout-guard] {
+  min-width: 0;
+  max-width: 100%;
+}
+[data-layout-guard] [data-text-safe] {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.card-grid-equal {
+  grid-auto-rows: 1fr;
+}
+@media (max-width: 639px) {
+  [data-layout-guard] {
+    border-radius: 14px;
+  }
+}

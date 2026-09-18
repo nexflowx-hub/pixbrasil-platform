@@ -48,8 +48,8 @@ export function Trust() {
                 <feature.icon className="h-[18px] w-[18px] text-pix" aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <p className="text-[12.5px] font-semibold leading-[1.28] text-cream">{feature.title}</p>
-                <p className="mt-1.5 text-[10.8px] leading-[1.42] text-dim">{feature.description}</p>
+                <p data-text-safe className="text-[12.5px] font-semibold leading-[1.28] text-cream">{feature.title}</p>
+                <p data-text-safe className="mt-1.5 text-[10.8px] leading-[1.42] text-dim">{feature.description}</p>
               </div>
             </li>
           ))}

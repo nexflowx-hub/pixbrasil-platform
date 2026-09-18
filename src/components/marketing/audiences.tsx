@@ -45,7 +45,7 @@ function AudienceCard({
     <article
       id={id}
       data-layout-guard="audience-card"
-      className="card-hover group relative flex min-h-[255px] flex-col overflow-hidden rounded-2xl border border-[rgba(43,231,181,0.4)] bg-[linear-gradient(110deg,rgba(3,22,24,0.98),rgba(5,24,27,0.76))] p-5 sm:min-h-[238px] sm:p-6"
+      className="card-hover group relative flex min-h-[270px] flex-col overflow-hidden rounded-2xl border border-[rgba(43,231,181,0.4)] bg-[linear-gradient(110deg,rgba(3,22,24,0.98),rgba(5,24,27,0.76))] p-5 sm:min-h-[252px] sm:p-6"
     >
       <div aria-hidden="true" className="absolute inset-y-0 right-0 w-full sm:w-[48%] lg:w-[44%]">
         <Image
@@ -65,24 +65,24 @@ function AudienceCard({
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(3,22,24,0.98)_0%,rgba(3,22,24,0.68)_46%,rgba(2,9,11,0.48)_100%)]" />
       </div>
 
-      <div className="relative z-10 flex h-full max-w-full flex-1 flex-col sm:max-w-[64%] lg:max-w-[62%]">
+      <div className="relative z-10 flex h-full min-w-0 max-w-full flex-1 flex-col sm:max-w-[68%] lg:max-w-[66%] xl:max-w-[64%]">
         <div className="flex items-start gap-3.5">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-pix/30 bg-pix/[0.08]">
             <Icon className="h-5 w-5 text-pix" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <h2 className="text-[19px] font-bold tracking-[-0.02em] text-cream">{title}</h2>
-            <p className="mt-0.5 text-[12.5px] font-medium leading-snug text-mist">{subtitle}</p>
+            <h2 data-text-safe className="text-[19px] font-bold tracking-[-0.02em] text-cream">{title}</h2>
+            <p data-text-safe className="mt-0.5 text-[12.5px] font-medium leading-snug text-mist">{subtitle}</p>
           </div>
         </div>
 
-        <p className="mt-3 text-[12.5px] leading-[1.58] text-mist">{description}</p>
+        <p data-text-safe className="mt-3 text-[12.5px] leading-[1.58] text-mist">{description}</p>
 
-        <ul className="mt-4 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+        <ul className="mt-4 grid grid-cols-1 gap-x-4 gap-y-2 2xl:grid-cols-2">
           {benefits.map((benefit) => (
             <li key={benefit} className="flex min-w-0 items-start gap-1.5 text-[11px] font-medium leading-snug text-mist">
               <CircleCheck className="mt-[1px] h-3.5 w-3.5 shrink-0 text-pix" aria-hidden="true" />
-              <span>{benefit}</span>
+              <span data-text-safe>{benefit}</span>
             </li>
           ))}
         </ul>
