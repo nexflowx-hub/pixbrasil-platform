@@ -20,6 +20,20 @@ export type ProviderRecoveryOutcome =
   | { kind: "NOT_FOUND" }
   | { kind: "UNKNOWN"; message?: string };
 
+export type NormalizedProviderStatus =
+  | "PENDING"
+  | "SUCCEEDED"
+  | "FAILED"
+  | "CANCELED"
+  | "REFUNDED"
+  | "UNKNOWN";
+
+export interface ProviderHealthResult {
+  status: "HEALTHY" | "DEGRADED" | "DOWN" | "UNKNOWN";
+  latencyMs: number;
+  detail?: string;
+}
+
 export interface PixCreateChargeInput {
   paymentIntentId: string;
   externalReference: string;
@@ -39,13 +53,28 @@ export interface PixProviderAdapter {
   readonly code: ProviderCode;
   readonly capabilities: ProviderCapabilities;
 
-  createCharge(input: PixCreateChargeInput, credentials: unknown): Promise<ProviderCreateOutcome>;
-  recoverCreate(externalReference: string, credentials: unknown): Promise<ProviderRecoveryOutcome>;
-  getCharge(providerPaymentId: string, credentials: unknown): Promise<unknown>;
+  createCharge(
+    input: PixCreateChargeInput,
+    credentials: unknown,
+  ): Promise<ProviderCreateOutcome>;
+
+  recoverCreate(
+    idempotencyReference: string,
+    credentials: unknown,
+  ): Promise<ProviderRecoveryOutcome>;
+
+  getCharge(
+    providerPaymentId: string,
+    credentials: unknown,
+  ): Promise<unknown>;
+
   verifyWebhook(
     payload: unknown,
     headers: Record<string, string | string[] | undefined>,
     credentials: unknown,
   ): Promise<unknown>;
-  healthCheck(credentials: unknown): Promise<{ ok: boolean; latencyMs: number; detail?: string }>;
+
+  mapProviderStatus(payload: unknown): NormalizedProviderStatus;
+
+  healthCheck(credentials: unknown): Promise<ProviderHealthResult>;
 }
