@@ -25,10 +25,13 @@ export function PwaInstallPrompt() {
     const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isSafari = /safari/i.test(navigator.userAgent) && !/crios|fxios|edgios/i.test(navigator.userAgent);
 
-    if (isIos && isSafari) {
-      setIosHint(true);
-      setVisible(true);
-    }
+    const iosTimer =
+      isIos && isSafari
+        ? window.setTimeout(() => {
+            setIosHint(true);
+            setVisible(true);
+          }, 0)
+        : null;
 
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -46,6 +49,7 @@ export function PwaInstallPrompt() {
     window.addEventListener("appinstalled", onInstalled);
 
     return () => {
+      if (iosTimer !== null) window.clearTimeout(iosTimer);
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onInstalled);
     };
