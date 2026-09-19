@@ -87,7 +87,7 @@ export function HeroSection() {
             className="anim-hero-text text-[10.5px] font-bold uppercase tracking-[0.3em] text-aqua sm:text-[11px]"
             style={{ animationDelay: "0.05s" }}
           >
-            Brasil conectado a um novo sistema financeiro
+            MVP privado · infraestrutura financeira em validação
           </p>
 
           <h1 className="mt-4 text-[42px] font-bold leading-[0.99] tracking-[-0.035em] text-cream sm:text-[44px] lg:text-[42px] xl:text-[50px] 2xl:text-[52px] 3xl:text-[54px]">
@@ -115,9 +115,10 @@ export function HeroSection() {
             className="anim-hero-item mt-5 max-w-[520px] text-[15px] leading-[1.55] text-mist sm:text-[15.5px]"
             style={{ animationDelay: "0.4s" }}
           >
-            Receba em PIX, mantenha o valor em ativos digitais e tenha
-            liberdade para sacar em BRL ou cripto. Mais possibilidades para
-            você e para o seu negócio, com a segurança que o Brasil confia.
+            Uma camada brasileira para organizar PIX, routing, saldos e
+            liquidação digital com rastreabilidade de ponta a ponta. O acesso
+            inicial é controlado enquanto cada rail financeiro conclui sua
+            validação operacional.
           </p>
 
           <div
@@ -128,7 +129,7 @@ export function HeroSection() {
               href="/early-access"
               className="btn-cta group flex h-[46px] items-center justify-center gap-2.5 whitespace-nowrap rounded-full px-7 text-[14.5px] font-bold"
             >
-              Abrir conta
+              Solicitar acesso
               <ArrowRight
                 className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
                 aria-hidden="true"
