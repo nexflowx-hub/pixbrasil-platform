@@ -14,7 +14,7 @@ export const INITIAL_PROVIDER_LIBRARY: ProviderDefinition[] = [
       pixBrl: true,
       supportsIdempotencyKey: false,
       supportsRecoveryByExternalId: true,
-      supportsWebhookSignature: false,
+      supportsWebhookSignature: true,
       supportsS2SVerification: true,
       supportsRefund: false,
     },
