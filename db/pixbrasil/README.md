@@ -14,6 +14,7 @@ Logical boundaries:
 - `20260918053604 pixbrasil_initial_providers`
 - `20260919070831 pixbrasil_route_economics_release_v1`
 - `20260919071256 pixbrasil_merchant_api_keys_v1`
+- `20260919071907 pixbrasil_route_economics_indexes_v1`
 
 Applied on 18 September 2026 after validating the exact schema + seed inside `BEGIN/ROLLBACK`.
 
