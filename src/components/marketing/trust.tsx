@@ -3,7 +3,7 @@ import { ClipboardCheck, Clock3, Share2, ShieldCheck } from "lucide-react";
 const FEATURES = [
   { icon: ShieldCheck, title: "Infraestrutura segura", description: "Controles técnicos, segregação de funções e trilha auditável." },
   { icon: Clock3, title: "Liquidação operacional", description: "Estados de processamento claros, sem esconder etapas intermediárias." },
-  { icon: Share2, title: "Liquid e TRON", description: "Rails digitais separados por ativo, rede e política operacional." },
+  { icon: Share2, title: "Arquitetura multi-rail", description: "Ativos, redes e providers habilitados somente por política e disponibilidade real." },
   { icon: ClipboardCheck, title: "Gestão de risco", description: "Monitoramento, revisão operacional e decisões registradas." },
 ];
 
@@ -37,7 +37,7 @@ export function Trust() {
           <p className="text-[10.5px] font-bold uppercase tracking-[0.28em] text-pix">Confiança</p>
           <h2 className="mt-1 text-[19px] font-extrabold tracking-[-0.02em] text-cream">EM CADA OPERAÇÃO</h2>
           <p className="mt-1.5 text-[11.5px] leading-[1.55] text-mist">
-            Infraestrutura robusta, processos revisados e foco em segurança operacional.
+            Guardrails técnicos, estados explícitos e ativação progressiva de cada capacidade financeira.
           </p>
         </div>
 
