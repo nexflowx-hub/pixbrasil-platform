@@ -1,0 +1,43 @@
+name: Admin Quality
+
+on:
+  push:
+    branches: [main, "feat/**", "fix/**"]
+    paths:
+      - "apps/admin/**"
+      - "services/api/src/main.ts"
+      - ".github/workflows/admin-quality.yml"
+  pull_request:
+    paths:
+      - "apps/admin/**"
+      - "services/api/src/main.ts"
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/admin
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_SUPABASE_URL: "https://aakdyumavlzgyklbrsrw.supabase.co"
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_lyIwbPhKld_yf0gZQb-Ecg_sY1UyQ5T"
+      NEXT_PUBLIC_API_URL: "https://api.pixbrasil.org"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          package-manager-cache: false
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Dependency audit
+        run: npm audit --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run build
