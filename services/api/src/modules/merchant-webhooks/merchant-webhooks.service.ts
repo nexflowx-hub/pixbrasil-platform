@@ -46,6 +46,7 @@ interface DeliveryPayment {
   providerCode: string | null;
   providerPaymentId: string | null;
   completedAt: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 function readEvents(value: unknown): PaymentEventType[] {
@@ -354,6 +355,7 @@ export class MerchantWebhooksService {
             paymentId: payment.providerPaymentId,
           },
           completedAt: payment.completedAt,
+          metadata: payment.metadata ?? {},
         },
       };
 
