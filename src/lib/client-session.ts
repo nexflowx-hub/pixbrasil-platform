@@ -16,8 +16,9 @@ const CORE_API_URL = (
   "https://api.pixbrasil.org"
 ).replace(/\/+$/, "");
 
-const ACCESS_COOKIE = "__Host-pixbrasil_access";
-const REFRESH_COOKIE = "__Host-pixbrasil_refresh";
+const COOKIE_PREFIX = process.env.NODE_ENV === "production" ? "__Host-" : "";
+const ACCESS_COOKIE = COOKIE_PREFIX + "pixbrasil_access";
+const REFRESH_COOKIE = COOKIE_PREFIX + "pixbrasil_refresh";
 
 type TokenPayload = {
   access_token?: string;
