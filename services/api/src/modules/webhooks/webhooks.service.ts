@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
@@ -32,7 +33,7 @@ export class WebhooksService {
   ) {
     const transactionId = String(payload.transactionId ?? "").trim();
     if (!transactionId) {
-      throw new BadGatewayException("MisticPay webhook is missing transactionId.");
+      throw new BadRequestException("MisticPay webhook is missing transactionId.");
     }
 
     const connection = await this.database.query<{
