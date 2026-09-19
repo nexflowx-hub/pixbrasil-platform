@@ -66,7 +66,7 @@ test("MisticPay webhook is S2S verified and stored without payer PII", async () 
   assert.equal(result.verifiedStatus, "SUCCEEDED");
 
   const insert = queries.find((entry) =>
-    entry.sql.includes("insert into public.webhook_events"),
+    entry.sql.includes("insert into pixbrasil.provider_webhook_events"),
   );
   assert.ok(insert);
   const persistedPayload = JSON.parse(String(insert.params[4]));
