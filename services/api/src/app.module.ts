@@ -4,6 +4,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { HealthModule } from "./modules/health/health.module";
 import { ProvidersModule } from "./modules/providers/providers.module";
 import { RoutingModule } from "./modules/routing/routing.module";
+import { WebhooksModule } from "./modules/webhooks/webhooks.module";
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { RoutingModule } from "./modules/routing/routing.module";
     AdminModule,
     ProvidersModule,
     RoutingModule,
+    WebhooksModule,
   ],
 })
 export class AppModule {}

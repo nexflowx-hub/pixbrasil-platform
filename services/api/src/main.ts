@@ -20,6 +20,7 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.set("trust proxy", 1);
+  app.disable("x-powered-by");
   app.enableCors({
     origin: adminOrigins,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
