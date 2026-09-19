@@ -149,8 +149,42 @@ export function MerchantControlPlane() {
   }, [hydrateDrafts]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+
+    adminFetch<{ success: true; data: Merchant[] }>("/api/v1/admin/merchants")
+      .then(async (response) => {
+        const keyPairs = await Promise.all(
+          response.data.map(async (merchant) => {
+            const keyResponse = await adminFetch<{
+              success: true;
+              data: ApiKeyRow[];
+            }>(`/api/v1/admin/merchants/${merchant.id}/api-keys`);
+            return [merchant.id, keyResponse.data] as const;
+          }),
+        );
+
+        if (!active) return;
+        setMerchants(response.data);
+        setKeys(Object.fromEntries(keyPairs));
+        hydrateDrafts(response.data);
+        setError("");
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Não foi possível carregar o Merchant Control Plane.",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [hydrateDrafts]);
 
   function updateDraft(merchantId: string, patch: Partial<KeyDraft>) {
     setDrafts((current) => ({
