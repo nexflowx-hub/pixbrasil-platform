@@ -54,10 +54,12 @@ export function DataPage({ kind }: { kind: PageKind }) {
 
   useEffect(() => {
     let active = true;
-    setError("");
     adminFetch<unknown>(meta.endpoint)
       .then((data) => {
-        if (active) setPayload(data);
+        if (active) {
+          setError("");
+          setPayload(data);
+        }
       })
       .catch((cause: unknown) => {
         if (active)
