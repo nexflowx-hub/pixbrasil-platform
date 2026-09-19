@@ -12,8 +12,8 @@ const NAV_ITEMS = [
     href: "#para-voce",
     dropdown: [
       { label: "Conta pessoal", href: "/personal" },
-      { label: "Carteira multiativos", href: "/personal" },
-      { label: "Saques via PIX ou cripto", href: "/how-it-works" },
+      { label: "Client Portal", href: "/login" },
+      { label: "Estado das capacidades", href: "/personal" },
     ],
   },
   {
@@ -21,11 +21,12 @@ const NAV_ITEMS = [
     href: "#empresas",
     dropdown: [
       { label: "Conta empresarial", href: "/business" },
-      { label: "API PIX", href: "/business" },
-      { label: "Links de pagamento", href: "/business" },
+      { label: "API PIX", href: "/docs/api" },
+      { label: "Documentação para IA", href: "/docs/ai-setup" },
     ],
   },
   { label: "Como Funciona", href: "/how-it-works" },
+  { label: "Documentação", href: "/docs" },
   { label: "Tarifas", href: "/pricing" },
   { label: "Segurança", href: "#seguranca" },
 ] as const;
@@ -98,7 +99,7 @@ export function SiteHeader() {
             href="/early-access"
             className="btn-cta hidden h-9 items-center whitespace-nowrap rounded-full px-5 text-[13px] font-semibold sm:flex"
           >
-            Criar conta
+            Solicitar acesso
           </Link>
 
           <span
@@ -168,7 +169,7 @@ export function SiteHeader() {
               onClick={close}
               className="btn-cta flex h-11 items-center justify-center rounded-full text-[14px] font-semibold"
             >
-              Criar conta
+              Solicitar acesso
             </Link>
           </div>
           <div className="mt-5 flex items-center gap-2 px-1">
