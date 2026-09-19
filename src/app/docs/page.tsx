@@ -9,9 +9,9 @@ export const metadata: Metadata = {
   description: "Guia oficial de integração do PiXBrasil para merchants.",
 };
 
-const quickStart = "# Server-side only\\nPIXBRASIL_API_URL=https://api.pixbrasil.org/api/v1\\nPIXBRASIL_API_KEY=pix_live_...\\nPIXBRASIL_STORE=SIGNUM";
+const quickStart = "# Server-side only\nPIXBRASIL_API_URL=https://api.pixbrasil.org/api/v1\nPIXBRASIL_API_KEY=pix_live_...\nPIXBRASIL_STORE=SIGNUM";
 
-const charge = "curl -X POST https://api.pixbrasil.org/api/v1/payments/charge \\\\\\n  -H \\"Authorization: Bearer $PIXBRASIL_API_KEY\\" \\\\\\n  -H \\"Idempotency-Key: order-8472-pix-1\\" \\\\\\n  -H \\"Content-Type: application/json\\" \\\\\\n  -d '{\\n    \\"store\\": \\"SIGNUM\\",\\n    \\"amount\\": 149.90,\\n    \\"currency\\": \\"BRL\\",\\n    \\"reference\\": \\"ORDER-8472\\",\\n    \\"payer\\": {\\n      \\"name\\": \\"Cliente Exemplo\\",\\n      \\"taxId\\": \\"CPF_OU_CNPJ_VALIDO\\"\\n    },\\n    \\"metadata\\": {\\n      \\"orderId\\": \\"8472\\",\\n      \\"attribution\\": {\\n        \\"utm_source\\": \\"meta\\",\\n        \\"utm_campaign\\": \\"signum-launch\\"\\n      }\\n    }\\n  }'";
+const charge = "curl -X POST https://api.pixbrasil.org/api/v1/payments/charge \\\n  -H \"Authorization: Bearer $PIXBRASIL_API_KEY\" \\\n  -H \"Idempotency-Key: order-8472-pix-1\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"store\": \"SIGNUM\",\n    \"amount\": 149.90,\n    \"currency\": \"BRL\",\n    \"reference\": \"ORDER-8472\",\n    \"payer\": {\n      \"name\": \"Cliente Exemplo\",\n      \"taxId\": \"CPF_OU_CNPJ_VALIDO\"\n    },\n    \"metadata\": {\n      \"orderId\": \"8472\",\n      \"attribution\": {\n        \"utm_source\": \"meta\",\n        \"utm_campaign\": \"signum-launch\"\n      }\n    }\n  }'";
 
 export default function DocsHomePage() {
   return (
