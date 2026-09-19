@@ -151,6 +151,113 @@ export class PaymentsService {
     private readonly routing: RoutingEngineService,
   ) {}
 
+  async getPayment(
+    merchant: MerchantApiContext,
+    paymentIntentId: string,
+  ) {
+    const result = await this.database.query<{
+      id: string;
+      external_reference: string | null;
+      amount: string;
+      currency: string;
+      status: string;
+      payment_method: string;
+      created_at: string;
+      updated_at: string;
+      completed_at: string | null;
+      store_code: string;
+      store_name: string;
+      provider_code: string | null;
+      gateway_alias: string | null;
+      provider_payment_id: string | null;
+      provider_attempt_status: string | null;
+      ambiguous: boolean | null;
+      response_metadata: Record<string, unknown> | null;
+      metadata: Record<string, unknown>;
+    }>(
+      `
+      select
+        pi.id,
+        pi.external_reference,
+        pi.amount::text,
+        pi.currency,
+        pi.status,
+        pi.payment_method,
+        pi.created_at::text,
+        pi.updated_at::text,
+        pi.completed_at::text,
+        s.code as store_code,
+        s.name as store_name,
+        p.code as provider_code,
+        gc.alias as gateway_alias,
+        pa.provider_payment_id,
+        pa.status as provider_attempt_status,
+        pa.ambiguous,
+        pa.response_metadata,
+        pi.metadata
+      from pixbrasil.payment_intents pi
+      join pixbrasil.stores s on s.id=pi.store_id
+      join pixbrasil.merchant_api_key_store_grants g
+        on g.store_id=s.id
+       and g.api_key_id=$1::uuid
+      left join lateral (
+        select pa0.*
+        from pixbrasil.provider_attempts pa0
+        where pa0.payment_intent_id=pi.id
+        order by pa0.attempt_no desc
+        limit 1
+      ) pa on true
+      left join pixbrasil.gateway_connections gc
+        on gc.id=coalesce(pa.gateway_connection_id,pi.selected_connection_id)
+      left join public.providers p on p.id=gc.provider_id
+      where pi.id=$2::uuid
+        and pi.merchant_id=$3::uuid
+      limit 1
+      `,
+      [merchant.apiKeyId, paymentIntentId, merchant.merchantId],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      throw new NotFoundException(
+        "PaymentIntent not found or not granted to this API key.",
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        paymentIntentId: row.id,
+        reference: row.external_reference,
+        amount: Number(row.amount),
+        currency: row.currency,
+        paymentMethod: row.payment_method,
+        status: row.status,
+        store: {
+          code: row.store_code,
+          name: row.store_name,
+        },
+        routing: {
+          providerCode: row.provider_code,
+          gatewayAlias: row.gateway_alias,
+          mode: row.metadata?.routingMode ?? null,
+          releaseClass: row.metadata?.releaseClass ?? null,
+        },
+        provider: row.provider_payment_id
+          ? {
+              paymentId: row.provider_payment_id,
+              attemptStatus: row.provider_attempt_status,
+              ambiguous: Boolean(row.ambiguous),
+            }
+          : null,
+        economics: row.metadata?.shadowQuote ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        completedAt: row.completed_at,
+      },
+    };
+  }
+
   async createShadowCharge(
     merchant: MerchantApiContext,
     idempotencyKeyValue: string | undefined,
