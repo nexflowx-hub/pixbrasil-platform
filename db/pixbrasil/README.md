@@ -12,6 +12,8 @@ Logical boundaries:
 
 - `20260918053600 pixbrasil_foundation_v1`
 - `20260918053604 pixbrasil_initial_providers`
+- `20260919070831 pixbrasil_route_economics_release_v1`
+- `20260919071256 pixbrasil_merchant_api_keys_v1`
 
 Applied on 18 September 2026 after validating the exact schema + seed inside `BEGIN/ROLLBACK`.
 
@@ -60,3 +62,18 @@ A provider becomes executable only after:
 - health snapshots
 - webhook inbox
 - settlement state
+
+
+## Novidades.Store pilot
+
+The controlled pilot uses five store-scoped routing policies:
+
+- SIGNUM -> MisticPay D0
+- AUTOHUB360 -> MisticPay D0
+- MYPETS-LOJA -> MisticPay D0
+- MYPETS-ONG -> PixGo D1
+- SAUDAVEL-LOJA -> MisticPay D0
+
+Cross-release-class failover is disabled. D0 and D1 are separate commercial/release products.
+
+Route economics are stored in `route_cost_profiles/rules`. Merchant-facing PiXBrasil fees remain in `fee_profiles/rules`. The initial pilot platform markup is zero until commercial pricing is explicitly configured.
