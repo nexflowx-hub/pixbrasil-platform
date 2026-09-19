@@ -538,6 +538,7 @@ export class MerchantWebhooksService {
     let response: Response | null = null;
     let error = "";
     try {
+      await validateEndpointUrl(input.endpoint.endpoint_url);
       response = await fetch(input.endpoint.endpoint_url, {
         method: "POST",
         headers: {
