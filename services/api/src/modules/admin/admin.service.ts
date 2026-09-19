@@ -632,7 +632,7 @@ export class AdminService {
       )
       values(
         $1::uuid,$2::varchar,$3::varchar,$4::char(64),
-        ARRAY['payments:create']::text[],'ACTIVE',$5::uuid,
+        ARRAY['payments:create','webhooks:manage']::text[],'ACTIVE',$5::uuid,
         jsonb_build_object(
           'secretReturnedOnce',true,
           'createdFrom','PIXBRASIL_ADMIN',
@@ -694,7 +694,7 @@ export class AdminService {
         name,
         keyPrefix,
         secret: plaintext,
-        scopes: ["payments:create"],
+        scopes: ["payments:create", "webhooks:manage"],
         storeCodes: grantedStores.map((store) => store.code),
         warning: "This secret is shown once and is not recoverable.",
       },

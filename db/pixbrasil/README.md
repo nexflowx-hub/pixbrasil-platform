@@ -15,6 +15,8 @@ Logical boundaries:
 - `20260919070831 pixbrasil_route_economics_release_v1`
 - `20260919071256 pixbrasil_merchant_api_keys_v1`
 - `20260919071907 pixbrasil_route_economics_indexes_v1`
+- `20260919194326 pixbrasil_merchant_webhooks_v1`
+- `20260919195803 pixbrasil_merchant_webhook_indexes_v1`
 
 Applied on 18 September 2026 after validating the exact schema + seed inside `BEGIN/ROLLBACK`.
 
@@ -78,3 +80,14 @@ The controlled pilot uses five store-scoped routing policies:
 Cross-release-class failover is disabled. D0 and D1 are separate commercial/release products.
 
 Route economics are stored in `route_cost_profiles/rules`. Merchant-facing PiXBrasil fees remain in `fee_profiles/rules`. The initial pilot platform markup is zero until commercial pricing is explicitly configured.
+
+
+## Merchant outbound webhooks
+
+Merchant-owned HTTPS webhook endpoints are stored in `merchant_webhook_endpoints`.
+Signing secrets live only in Supabase Vault and are returned once at creation.
+
+Verified provider payment changes can emit signed events such as
+`payment.succeeded`, `payment.failed`, `payment.canceled` and
+`payment.pending`. Delivery attempts are persisted in
+`merchant_webhook_deliveries` for audit and future replay tooling.

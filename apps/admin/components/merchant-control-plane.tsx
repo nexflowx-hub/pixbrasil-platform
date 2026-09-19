@@ -502,7 +502,7 @@ export function MerchantControlPlane() {
 
                 <div className="merchant-key-builder-actions">
                   <span>
-                    Scope: <code>payments:create</code> ·{" "}
+                    Scopes: <code>payments:create</code> + <code>webhooks:manage</code> ·{" "}
                     {draft.storeCodes.length} Store(s)
                   </span>
                   <button

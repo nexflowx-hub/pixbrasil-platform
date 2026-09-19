@@ -3,6 +3,7 @@ import { SITE_URL } from "@/config/site";
 
 const PUBLIC_ROUTES = [
   "/","/personal","/business","/pricing","/how-it-works","/support",
+  "/docs","/docs/api","/docs/webhooks","/docs/ai-setup","/docs/tracking",
   "/legal/terms","/legal/privacy","/legal/cookies","/legal/risk-disclosure",
   "/legal/regulatory-status","/legal/aml-kyc","/legal/acceptable-use"
 ];

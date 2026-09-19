@@ -1,1 +1,1 @@
-User-agent: *\nAllow: /\nDisallow: /login\nDisallow: /api/\n\nSitemap: https://pixbrasil.org/sitemap.xml\n
+User-agent: *\nAllow: /\nDisallow: /login\nDisallow: /app\nDisallow: /api/\n\nSitemap: https://pixbrasil.org/sitemap.xml\n
