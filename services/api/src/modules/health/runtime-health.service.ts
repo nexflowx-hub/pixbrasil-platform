@@ -19,7 +19,7 @@ export class RuntimeHealthService {
       success: ready,
       service: "PiXBrasil",
       component: "api",
-      version: "0.2.0",
+      version: process.env.APP_VERSION ?? "0.3.0",
       status: ready ? "READY" : "NOT_READY",
       database,
       redis,
