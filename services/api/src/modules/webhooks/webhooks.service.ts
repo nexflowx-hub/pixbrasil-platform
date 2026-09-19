@@ -335,6 +335,7 @@ export class WebhooksService {
       status: string;
       store_code: string | null;
       completed_at: string | null;
+      merchant_metadata: Record<string, unknown> | null;
     }>(
       `
       with matched_attempt as (
@@ -379,7 +380,8 @@ export class WebhooksService {
           pi.amount,
           pi.currency,
           pi.status,
-          pi.completed_at
+          pi.completed_at,
+          pi.metadata
       )
       select
         ui.id as payment_intent_id,
@@ -389,7 +391,8 @@ export class WebhooksService {
         ui.currency,
         ui.status,
         s.code as store_code,
-        ui.completed_at::text
+        ui.completed_at::text,
+        ui.metadata->'merchantMetadata' as merchant_metadata
       from updated_intent ui
       left join pixbrasil.stores s on s.id=ui.store_id
       `,
@@ -410,6 +413,7 @@ export class WebhooksService {
       providerCode,
       providerPaymentId,
       completedAt: row.completed_at,
+      metadata: row.merchant_metadata ?? {},
     };
   }
 
