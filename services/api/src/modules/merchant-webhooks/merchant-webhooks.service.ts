@@ -10,6 +10,8 @@ import {
   randomBytes,
   randomUUID,
 } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { DatabaseService } from "../database/database.service";
 import type { MerchantApiContext } from "../merchant-auth/merchant-auth.types";
 
@@ -73,7 +75,36 @@ function readEvents(value: unknown): PaymentEventType[] {
   return events as PaymentEventType[];
 }
 
-function validateEndpointUrl(value: unknown): string {
+function isPrivateAddress(address: string) {
+  const normalized = address.toLowerCase();
+
+  if (normalized === "::1" || normalized === "::" || normalized.startsWith("fc") ||
+      normalized.startsWith("fd") || normalized.startsWith("fe8") ||
+      normalized.startsWith("fe9") || normalized.startsWith("fea") ||
+      normalized.startsWith("feb")) {
+    return true;
+  }
+
+  const ipv4 = normalized.startsWith("::ffff:")
+    ? normalized.slice("::ffff:".length)
+    : normalized;
+
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(ipv4)) return false;
+
+  const [a, b] = ipv4.split(".").map(Number);
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a >= 224
+  );
+}
+
+async function validateEndpointUrl(value: unknown): Promise<string> {
   const raw = String(value ?? "").trim();
   let url: URL;
   try {
@@ -94,6 +125,39 @@ function validateEndpointUrl(value: unknown): string {
 
   if (url.hash) {
     throw new BadRequestException("Webhook URLs must not contain fragments.");
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal")
+  ) {
+    throw new BadRequestException(
+      "Webhook endpoint must resolve to a public host.",
+    );
+  }
+
+  if (isIP(hostname) && isPrivateAddress(hostname)) {
+    throw new BadRequestException(
+      "Webhook endpoint must not target a private network.",
+    );
+  }
+
+  let addresses: Array<{ address: string }>;
+  try {
+    addresses = await lookup(hostname, { all: true });
+  } catch {
+    throw new BadRequestException(
+      "Webhook endpoint hostname could not be resolved.",
+    );
+  }
+
+  if (!addresses.length || addresses.some((entry) => isPrivateAddress(entry.address))) {
+    throw new BadRequestException(
+      "Webhook endpoint must resolve only to public IP addresses.",
+    );
   }
 
   return url.toString();
@@ -144,13 +208,30 @@ export class MerchantWebhooksService {
     merchant: MerchantApiContext,
     body: Record<string, unknown>,
   ) {
-    const endpointUrl = validateEndpointUrl(
+    const endpointUrl = await validateEndpointUrl(
       body.endpointUrl ?? body.url,
     );
     const name =
       String(body.name ?? "").trim().slice(0, 120) ||
       "Production webhook";
     const events = readEvents(body.events);
+
+    const existing = await this.database.query<{ id: string }>(
+      `
+      select id
+      from pixbrasil.merchant_webhook_endpoints
+      where merchant_id=$1::uuid
+        and endpoint_url=$2::text
+      limit 1
+      `,
+      [merchant.merchantId, endpointUrl],
+    );
+
+    if (existing.rows[0]) {
+      throw new ConflictException(
+        "A webhook endpoint with this URL already exists for the merchant.",
+      );
+    }
 
     const secret = "whsec_" + randomBytes(32).toString("base64url");
     const fingerprint = createHash("sha256")
@@ -469,6 +550,7 @@ export class MerchantWebhooksService {
         },
         body,
         signal: AbortSignal.timeout(3_000),
+        redirect: "error",
       });
     } catch (cause) {
       error =
