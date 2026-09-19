@@ -4,14 +4,14 @@ import { ArrowRight, Building2, CircleCheck, UserRound } from "lucide-react";
 
 const BENEFITS_PERSONAL = [
   "Carteira multiativos",
-  "Recebimento via PIX",
-  "Saque em BRL ou cripto",
+  "Portal com estados financeiros",
+  "Rails ativados por disponibilidade",
   "Gestão simplificada",
 ];
 
 const BENEFITS_BUSINESS = [
-  "API PIX robusta",
-  "Links de pagamento",
+  "API PIX S2S em piloto",
+  "Stores e routing por operação",
   "Liquidação em ativos digitais",
   "Suporte especializado",
 ];
@@ -109,7 +109,7 @@ export function Audiences() {
         id="para-voce"
         title="Para Você"
         subtitle="Mais liberdade para o seu dinheiro."
-        description="Receba em PIX, mantenha seus ativos digitais em Liquid e TRON e escolha como utilizar ou retirar seus recursos."
+        description="Acompanhe contas, wallets e estados operacionais em uma experiência única, com capacidades financeiras liberadas de forma progressiva e transparente."
         benefits={BENEFITS_PERSONAL}
         href="/personal"
         image="/images/rio-sunset.png"
@@ -120,7 +120,7 @@ export function Audiences() {
         id="empresas"
         title="Para Empresas"
         subtitle="Soluções completas para o seu negócio."
-        description="Receba via PIX, integre API e links de pagamento, organize suas lojas e acompanhe a liquidação digital em uma única operação."
+        description="Integre API PIX, separe Stores por regra comercial e acompanhe routing, provider e liberação em uma única camada operacional."
         benefits={BENEFITS_BUSINESS}
         href="/business"
         image="/images/sao-paulo-night.png"
