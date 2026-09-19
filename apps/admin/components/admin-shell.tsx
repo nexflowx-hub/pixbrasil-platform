@@ -189,7 +189,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </span>
             <span className="runtime-badge">
               <Activity size={14} />
-              API v0.3.0
+              API v0.4.0
             </span>
             <button className="icon-button" aria-label="Notificações">
               <Bell size={17} />

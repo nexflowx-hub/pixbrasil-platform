@@ -69,6 +69,32 @@ export class AdminController {
     return this.admin.promoteGatewayToShadow(connectionId);
   }
 
+  @Get("merchants")
+  @RequirePermissions("merchants.read")
+  merchants() {
+    return this.admin.listMerchants();
+  }
+
+  @Get("merchants/:merchantId/api-keys")
+  @RequirePermissions("merchants.read")
+  merchantApiKeys(@Param("merchantId") merchantId: string) {
+    return this.admin.listMerchantApiKeys(merchantId);
+  }
+
+  @Post("merchants/:merchantId/api-keys")
+  @RequirePermissions("merchants.manage")
+  createMerchantApiKey(
+    @Param("merchantId") merchantId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.createMerchantApiKey(
+      merchantId,
+      body,
+      request.adminContext!,
+    );
+  }
+
   @Get("routing/overview")
   @RequirePermissions("routing.read")
   routingOverview() {
