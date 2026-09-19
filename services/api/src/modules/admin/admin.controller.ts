@@ -95,6 +95,20 @@ export class AdminController {
     );
   }
 
+  @Post("merchants/:merchantId/api-keys/:apiKeyId/revoke")
+  @RequirePermissions("merchants.manage")
+  revokeMerchantApiKey(
+    @Param("merchantId") merchantId: string,
+    @Param("apiKeyId") apiKeyId: string,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.revokeMerchantApiKey(
+      merchantId,
+      apiKeyId,
+      request.adminContext!,
+    );
+  }
+
   @Get("routing/overview")
   @RequirePermissions("routing.read")
   routingOverview() {
