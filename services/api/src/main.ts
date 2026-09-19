@@ -11,7 +11,22 @@ async function bootstrap() {
     bufferLogs: true,
   });
 
+  const adminOrigins = (
+    process.env.ADMIN_ORIGINS ??
+    "https://admin.pixbrasil.org,http://localhost:3010"
+  )
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
   app.set("trust proxy", 1);
+  app.enableCors({
+    origin: adminOrigins,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type", "Accept"],
+    credentials: false,
+    maxAge: 600,
+  });
   app.setGlobalPrefix("api");
   app.enableShutdownHooks();
 
