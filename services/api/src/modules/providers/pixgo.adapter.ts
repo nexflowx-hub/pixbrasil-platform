@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type {
   NormalizedProviderStatus,
   PixCreateChargeInput,
@@ -20,12 +21,16 @@ const DEFAULT_BASE_URL = "https://pixgo.org/api/v1";
 
 interface PixGoCredentials {
   apiKey: string;
+  webhookSecret?: string;
   baseUrl: string;
 }
 
 function parseCredentials(value: unknown): PixGoCredentials {
   const credentials = asRecord(value);
   const apiKey = String(credentials.apiKey ?? credentials.api_key ?? "").trim();
+  const webhookSecret = String(
+    credentials.webhookSecret ?? credentials.webhook_secret ?? "",
+  ).trim();
   const baseUrl = String(credentials.baseUrl ?? DEFAULT_BASE_URL)
     .trim()
     .replace(/\/$/, "");
@@ -34,7 +39,11 @@ function parseCredentials(value: unknown): PixGoCredentials {
     throw new ProviderConfigurationError("PixGo apiKey is required.");
   }
 
-  return { apiKey, baseUrl };
+  return {
+    apiKey,
+    ...(webhookSecret ? { webhookSecret } : {}),
+    baseUrl,
+  };
 }
 
 export class PixGoAdapter implements PixProviderAdapter {
@@ -237,9 +246,53 @@ export class PixGoAdapter implements PixProviderAdapter {
 
   async verifyWebhook(
     payload: unknown,
-    _headers: Record<string, string | string[] | undefined>,
-    credentials: unknown,
+    headers: Record<string, string | string[] | undefined>,
+    credentialsValue: unknown,
+    rawBody?: Buffer,
   ): Promise<unknown> {
+    const credentials = parseCredentials(credentialsValue);
+    if (!credentials.webhookSecret) {
+      throw new Error("PIXGO_WEBHOOK_SECRET_MISSING");
+    }
+
+    const readHeader = (name: string) => {
+      const value = headers[name] ?? headers[name.toLowerCase()];
+      return Array.isArray(value) ? String(value[0] ?? "") : String(value ?? "");
+    };
+
+    const timestamp = readHeader("x-webhook-timestamp").trim();
+    const signature = readHeader("x-webhook-signature").trim().toLowerCase();
+
+    if (!timestamp || !/^\d+$/.test(timestamp)) {
+      throw new Error("PIXGO_WEBHOOK_TIMESTAMP_INVALID");
+    }
+    if (!/^[a-f0-9]{64}$/.test(signature)) {
+      throw new Error("PIXGO_WEBHOOK_SIGNATURE_INVALID");
+    }
+    if (!rawBody?.length) {
+      throw new Error("PIXGO_WEBHOOK_RAW_BODY_MISSING");
+    }
+
+    const timestampSeconds = Number(timestamp);
+    if (
+      !Number.isFinite(timestampSeconds) ||
+      Math.abs(Date.now() / 1000 - timestampSeconds) > 300
+    ) {
+      throw new Error("PIXGO_WEBHOOK_TIMESTAMP_EXPIRED");
+    }
+
+    const expected = createHmac("sha256", credentials.webhookSecret)
+      .update(timestamp + "." + rawBody.toString("utf8"))
+      .digest();
+
+    const received = Buffer.from(signature, "hex");
+    if (
+      expected.length !== received.length ||
+      !timingSafeEqual(expected, received)
+    ) {
+      throw new Error("PIXGO_WEBHOOK_SIGNATURE_INVALID");
+    }
+
     const root = asRecord(payload);
     const data = asRecord(root.data);
     const paymentId = String(
@@ -250,7 +303,7 @@ export class PixGoAdapter implements PixProviderAdapter {
       throw new Error("PixGo webhook does not contain payment_id.");
     }
 
-    return this.getCharge(paymentId, credentials);
+    return this.getCharge(paymentId, credentialsValue);
   }
 
   mapProviderStatus(payload: unknown): NormalizedProviderStatus {
