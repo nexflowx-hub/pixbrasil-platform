@@ -783,6 +783,379 @@ export class AdminService {
     };
   }
 
+  async onboardingOverview() {
+    const result = await this.database.query(
+      `
+      select
+        a.id,
+        a.type::text as account_type,
+        a.status::text as account_status,
+        a.kyc_status::text as kyc_status,
+        a.identity_level::text as identity_level,
+        a.country_code,
+        a.base_currency,
+        u.email,
+        u.status::text as user_status,
+        coalesce(
+          array_agg(distinct ap.product_code order by ap.product_code)
+            filter (where ap.product_code is not null),
+          '{}'::varchar[]
+        )::text[] as products,
+        (
+          select count(*)::int
+          from public.account_memberships am
+          where am.account_id=a.id and am.status='ACTIVE'
+        ) as active_members,
+        a.created_at
+      from public.accounts a
+      join public.users u on u.id=a.user_id
+      left join public.account_products ap on ap.account_id=a.id
+      group by a.id,u.id
+      order by a.created_at desc
+      limit 250
+      `,
+    );
+    return { success: true, data: result.rows };
+  }
+
+  async storesOverview() {
+    const result = await this.database.query(
+      `
+      select
+        s.id,
+        s.code,
+        s.name,
+        s.status,
+        s.currency,
+        m.trade_name as merchant,
+        m.tier_code,
+        rp.name as routing_policy,
+        rp.strategy,
+        rp.activation_mode,
+        gc.alias as gateway_alias,
+        p.code as provider_code,
+        gc.metadata->>'lastConnectionHealth' as provider_health,
+        rcp.code as route_cost_profile,
+        rel.code as release_profile,
+        rel.release_class,
+        sfp.allow_cross_release_class_failover,
+        s.updated_at
+      from pixbrasil.stores s
+      join pixbrasil.merchants m on m.id=s.merchant_id
+      left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
+      left join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
+      left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
+      left join lateral (
+        select rp0.*
+        from pixbrasil.routing_policies rp0
+        where rp0.store_id=s.id and rp0.status='ACTIVE'
+        order by rp0.priority asc,rp0.version desc
+        limit 1
+      ) rp on true
+      left join lateral (
+        select gc0.*
+        from pixbrasil.routing_routes rr0
+        join pixbrasil.gateway_connections gc0 on gc0.id=rr0.gateway_connection_id
+        where rr0.policy_id=rp.id and rr0.enabled=true
+        order by rr0.priority asc
+        limit 1
+      ) gc on true
+      left join public.providers p on p.id=gc.provider_id
+      order by m.trade_name,s.code
+      limit 500
+      `,
+    );
+    return { success: true, data: result.rows };
+  }
+
+  async transactionsOverview() {
+    const result = await this.database.query(
+      `
+      select
+        pi.id,
+        pi.external_reference,
+        pi.payment_method,
+        pi.amount::text,
+        pi.currency,
+        pi.status,
+        m.trade_name as merchant,
+        s.code as store_code,
+        p.code as provider_code,
+        gc.alias as gateway_alias,
+        pa.provider_payment_id,
+        pa.status as provider_attempt_status,
+        pa.ambiguous,
+        pi.created_at,
+        pi.completed_at
+      from pixbrasil.payment_intents pi
+      left join pixbrasil.merchants m on m.id=pi.merchant_id
+      left join pixbrasil.stores s on s.id=pi.store_id
+      left join lateral (
+        select pa0.*
+        from pixbrasil.provider_attempts pa0
+        where pa0.payment_intent_id=pi.id
+        order by pa0.attempt_no desc
+        limit 1
+      ) pa on true
+      left join pixbrasil.gateway_connections gc
+        on gc.id=coalesce(pa.gateway_connection_id,pi.selected_connection_id)
+      left join public.providers p on p.id=gc.provider_id
+      order by pi.created_at desc
+      limit 300
+      `,
+    );
+    return { success: true, data: result.rows };
+  }
+
+  async ledgerOverview() {
+    const [transactions, balances] = await Promise.all([
+      this.database.query(
+        `
+        select
+          lt.id,
+          lt.reference,
+          lt.type::text as type,
+          lt.status::text as status,
+          lt.external_reference,
+          (
+            select count(*)::int
+            from public.ledger_entries le
+            where le.ledger_transaction_id=lt.id
+          ) as entry_count,
+          lt.created_at,
+          lt.posted_at,
+          lt.reversed_at
+        from public.ledger_transactions lt
+        order by lt.created_at desc
+        limit 200
+        `,
+      ),
+      this.database.query(
+        `
+        select
+          a.id as account_id,
+          a.type::text as account_type,
+          ass.code as asset_code,
+          ass.symbol,
+          ass.network::text as network,
+          wb.available::text,
+          wb.pending::text,
+          wb.reserved::text,
+          wb.blocked::text,
+          w.status::text as wallet_status,
+          wb.updated_at
+        from public.wallet_balances wb
+        join public.wallets w on w.id=wb.wallet_id
+        join public.accounts a on a.id=w.account_id
+        join public.assets ass on ass.id=w.asset_id
+        order by a.type::text,ass.code
+        limit 500
+        `,
+      ),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        transactions: transactions.rows,
+        balances: balances.rows,
+      },
+    };
+  }
+
+  async settlementsOverview() {
+    const result = await this.database.query(
+      `
+      select
+        st.id,
+        st.payment_intent_id,
+        pi.external_reference,
+        m.trade_name as merchant,
+        s.code as store_code,
+        st.gross_brl::text,
+        st.provider_fee_brl::text,
+        st.platform_fee_brl::text,
+        st.net_brl::text,
+        st.settlement_asset,
+        st.settlement_network,
+        st.settlement_amount::text,
+        st.status,
+        st.available_at,
+        st.created_at
+      from pixbrasil.settlements st
+      join pixbrasil.payment_intents pi on pi.id=st.payment_intent_id
+      left join pixbrasil.merchants m on m.id=pi.merchant_id
+      left join pixbrasil.stores s on s.id=pi.store_id
+      order by st.created_at desc
+      limit 300
+      `,
+    );
+    return { success: true, data: result.rows };
+  }
+
+  async payoutsOverview() {
+    const result = await this.database.query(
+      `
+      select
+        pr.id,
+        pr.account_id,
+        a.type::text as account_type,
+        ass.code as asset_code,
+        ass.symbol,
+        pr.amount::text,
+        pr.destination_type,
+        pr.status,
+        pr.external_reference,
+        pr.approval_request_id,
+        pr.approved_at,
+        pr.paid_at,
+        pr.confirmed_at,
+        pr.created_at
+      from controlplane.payout_requests pr
+      join public.accounts a on a.id=pr.account_id
+      join public.assets ass on ass.id=pr.asset_id
+      order by pr.created_at desc
+      limit 300
+      `,
+    );
+    return { success: true, data: result.rows };
+  }
+
+  async usersOverview() {
+    const result = await this.database.query(
+      `
+      select
+        au.id,
+        u.email,
+        au.display_name,
+        au.status,
+        au.require_mfa,
+        au.last_seen_at,
+        coalesce(
+          array_agg(distinct r.code order by r.code)
+            filter (where r.code is not null),
+          '{}'::varchar[]
+        )::text[] as roles,
+        au.created_at
+      from controlplane.admin_users au
+      join auth.users u on u.id=au.auth_user_id
+      left join controlplane.admin_user_roles aur
+        on aur.admin_user_id=au.id
+       and (aur.expires_at is null or aur.expires_at > now())
+      left join controlplane.roles r on r.id=aur.role_id
+      group by au.id,u.email
+      order by au.created_at
+      `,
+    );
+    return { success: true, data: result.rows };
+  }
+
+  async auditOverview() {
+    const result = await this.database.query(
+      `
+      select
+        al.id,
+        al.actor_type::text,
+        au.display_name as actor_name,
+        auth_user.email as actor_email,
+        al.action,
+        al.resource_type,
+        al.resource_id,
+        al.request_id,
+        al.created_at
+      from public.audit_logs al
+      left join auth.users auth_user on auth_user.id=al.actor_user_id
+      left join controlplane.admin_users au on au.auth_user_id=al.actor_user_id
+      order by al.created_at desc
+      limit 500
+      `,
+    );
+    return { success: true, data: result.rows };
+  }
+
+  async systemOverview() {
+    const [flags, settings, migrations] = await Promise.all([
+      this.database.query(
+        `
+        select key,enabled,config,description,updated_at
+        from controlplane.feature_flags
+        order by key
+        `,
+      ),
+      this.database.query(
+        `
+        select key,value,description,updated_at
+        from controlplane.system_settings
+        order by key
+        `,
+      ),
+      this.database.query(
+        `
+        select version,name
+        from supabase_migrations.schema_migrations
+        order by version desc
+        limit 20
+        `,
+      ).catch(() => ({ rows: [] })),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        featureFlags: flags.rows,
+        settings: settings.rows,
+        migrations: migrations.rows,
+      },
+    };
+  }
+
+  async riskOverview() {
+    const [accounts, webhooks, intents] = await Promise.all([
+      this.database.query(
+        `
+        select
+          a.status::text as account_status,
+          a.kyc_status::text as kyc_status,
+          count(*)::int as total
+        from public.accounts a
+        group by a.status,a.kyc_status
+        order by a.status,a.kyc_status
+        `,
+      ),
+      this.database.query(
+        `
+        select status,count(*)::int as total
+        from pixbrasil.provider_webhook_events
+        group by status
+        order by status
+        `,
+      ),
+      this.database.query(
+        `
+        select status,count(*)::int as total
+        from pixbrasil.payment_intents
+        group by status
+        order by status
+        `,
+      ),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        accountPosture: accounts.rows,
+        webhookPosture: webhooks.rows,
+        paymentPosture: intents.rows,
+        controls: {
+          liveExecution: false,
+          automaticPayouts: false,
+          manualLedgerAdjustments: false,
+          note: "No dedicated risk scoring engine is active in the MVP.",
+        },
+      },
+    };
+  }
+
   async routingOverview() {
     const [policies, flags] = await Promise.all([
       this.database.query(
