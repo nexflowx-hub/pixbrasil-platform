@@ -11,7 +11,7 @@ export class HealthController {
       success: true,
       service: "PiXBrasil",
       component: "api",
-      version: "0.2.0",
+      version: process.env.APP_VERSION ?? "0.3.0",
       status: "ONLINE",
       timestamp: new Date().toISOString(),
     };
