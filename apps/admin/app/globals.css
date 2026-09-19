@@ -251,3 +251,31 @@ td strong { color:#c9d8d5; }
   .login-panel,.mfa-shell { padding:16px; }
   .login-card,.mfa-card { padding:25px 20px; }
 }
+
+.recovery-link {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #8fa8a2;
+  font-size: 11px;
+  transition: color .16s ease;
+}
+.recovery-link:hover { color: var(--green); }
+.recovery-success {
+  margin-top: 26px;
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 14px;
+  border: 1px solid rgba(33,242,154,.20);
+  background: rgba(33,242,154,.055);
+  border-radius: 12px;
+  color: var(--green);
+}
+.recovery-success strong,
+.recovery-success span { display: block; }
+.recovery-success strong { font-size: 12px; }
+.recovery-success span { margin-top: 4px; color: #8fa8a2; font-size: 10px; line-height: 1.55; }

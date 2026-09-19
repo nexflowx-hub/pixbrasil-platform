@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -120,6 +121,10 @@ export default function LoginPage() {
               {busy ? "A validar…" : "Continuar"}
               {!busy ? <ArrowRight size={17} /> : null}
             </button>
+
+            <Link href="/forgot-password" className="recovery-link">
+              Esqueci a senha
+            </Link>
           </form>
 
           <div className="login-footnote">
