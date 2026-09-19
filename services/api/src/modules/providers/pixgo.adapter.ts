@@ -44,7 +44,7 @@ export class PixGoAdapter implements PixProviderAdapter {
     pixBrl: true,
     supportsIdempotencyKey: false,
     supportsRecoveryByExternalId: true,
-    supportsWebhookSignature: false,
+    supportsWebhookSignature: true,
     supportsS2SVerification: true,
     supportsRefund: false,
   };
@@ -280,7 +280,7 @@ export class PixGoAdapter implements PixProviderAdapter {
 
     try {
       const response = await this.fetchImpl(
-        `${credentials.baseUrl}/payments?limit=1&offset=0`,
+        `${credentials.baseUrl}/payments?external_id=__pixbrasil_healthcheck__&limit=1&offset=0`,
         {
           method: "GET",
           headers: { "X-API-Key": credentials.apiKey },

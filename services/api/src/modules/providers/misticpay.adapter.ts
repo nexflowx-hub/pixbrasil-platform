@@ -18,24 +18,50 @@ import {
 const DEFAULT_BASE_URL = "https://api.misticpay.com/api";
 
 interface MisticPayCredentials {
-  ci: string;
-  cs: string;
+  clientId: string;
+  clientSecret: string;
   baseUrl: string;
+  authMode: "BASIC" | "LEGACY";
 }
 
 function parseCredentials(value: unknown): MisticPayCredentials {
   const credentials = asRecord(value);
-  const ci = String(credentials.ci ?? "").trim();
-  const cs = String(credentials.cs ?? "").trim();
+  const modernClientId = String(
+    credentials.clientId ?? credentials.client_id ?? credentials.pk ?? "",
+  ).trim();
+  const modernClientSecret = String(
+    credentials.clientSecret ??
+      credentials.client_secret ??
+      credentials.sk ??
+      "",
+  ).trim();
+  const legacyCi = String(credentials.ci ?? "").trim();
+  const legacyCs = String(credentials.cs ?? "").trim();
   const baseUrl = String(credentials.baseUrl ?? DEFAULT_BASE_URL)
     .trim()
     .replace(/\/$/, "");
 
-  if (!ci || !cs) {
-    throw new ProviderConfigurationError("MisticPay ci/cs credentials are required.");
+  if (modernClientId && modernClientSecret) {
+    return {
+      clientId: modernClientId,
+      clientSecret: modernClientSecret,
+      baseUrl,
+      authMode: "BASIC",
+    };
   }
 
-  return { ci, cs, baseUrl };
+  if (legacyCi && legacyCs) {
+    return {
+      clientId: legacyCi,
+      clientSecret: legacyCs,
+      baseUrl,
+      authMode: "LEGACY",
+    };
+  }
+
+  throw new ProviderConfigurationError(
+    "MisticPay clientId/clientSecret credentials are required.",
+  );
 }
 
 export class MisticPayAdapter implements PixProviderAdapter {
@@ -52,6 +78,25 @@ export class MisticPayAdapter implements PixProviderAdapter {
 
   constructor(private readonly fetchImpl: FetchLike = globalThis.fetch) {}
 
+  private headers(credentials: MisticPayCredentials): Record<string, string> {
+    if (credentials.authMode === "BASIC") {
+      return {
+        Authorization:
+          "Basic " +
+          Buffer.from(
+            `${credentials.clientId}:${credentials.clientSecret}`,
+          ).toString("base64"),
+        "Content-Type": "application/json",
+      };
+    }
+
+    return {
+      ci: credentials.clientId,
+      cs: credentials.clientSecret,
+      "Content-Type": "application/json",
+    };
+  }
+
   private async post(
     path: string,
     credentials: MisticPayCredentials,
@@ -59,11 +104,7 @@ export class MisticPayAdapter implements PixProviderAdapter {
   ): Promise<Response> {
     return this.fetchImpl(`${credentials.baseUrl}${path}`, {
       method: "POST",
-      headers: {
-        ci: credentials.ci,
-        cs: credentials.cs,
-        "Content-Type": "application/json",
-      },
+      headers: this.headers(credentials),
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(15_000),
     });
@@ -127,11 +168,16 @@ export class MisticPayAdapter implements PixProviderAdapter {
 
     let response: Response;
     try {
-      response = await this.post("/transactions/create", credentials, providerPayload);
+      response = await this.post(
+        "/transactions/create",
+        credentials,
+        providerPayload,
+      );
     } catch (error) {
       return {
         kind: "AMBIGUOUS",
-        message: error instanceof Error ? error.message : "MisticPay network failure",
+        message:
+          error instanceof Error ? error.message : "MisticPay network failure",
         requiresRecovery: true,
       };
     }
@@ -196,7 +242,9 @@ export class MisticPayAdapter implements PixProviderAdapter {
     const body = await readJson(response);
 
     if (!response.ok) {
-      throw new Error(`MisticPay getCharge returned HTTP ${response.status}.`);
+      throw new Error(
+        `MisticPay getCharge returned HTTP ${response.status}.`,
+      );
     }
 
     return body;
@@ -242,14 +290,42 @@ export class MisticPayAdapter implements PixProviderAdapter {
     return "UNKNOWN";
   }
 
-  async healthCheck(_credentials: unknown): Promise<ProviderHealthResult> {
-    // The currently verified MisticPay integration does not expose a harmless
-    // dedicated health endpoint. Runtime health should therefore be derived
-    // passively from real attempts and S2S verification metrics.
-    return {
-      status: "UNKNOWN",
-      latencyMs: 0,
-      detail: "PASSIVE_HEALTH_ONLY",
-    };
+  async healthCheck(
+    credentialsValue: unknown,
+  ): Promise<ProviderHealthResult> {
+    const credentials = parseCredentials(credentialsValue);
+    const startedAt = Date.now();
+
+    if (credentials.authMode !== "BASIC") {
+      return {
+        status: "DEGRADED",
+        latencyMs: 0,
+        detail: "LEGACY_CI_CS_REQUIRES_MIGRATION",
+      };
+    }
+
+    try {
+      const response = await this.fetchImpl(
+        `${credentials.baseUrl}/users/info`,
+        {
+          method: "GET",
+          headers: this.headers(credentials),
+          signal: AbortSignal.timeout(5_000),
+        },
+      );
+
+      return {
+        status: response.ok ? "HEALTHY" : "DEGRADED",
+        latencyMs: Date.now() - startedAt,
+        detail: response.ok ? undefined : `HTTP_${response.status}`,
+      };
+    } catch (error) {
+      return {
+        status: "DOWN",
+        latencyMs: Date.now() - startedAt,
+        detail:
+          error instanceof Error ? error.message : "NETWORK_ERROR",
+      };
+    }
   }
 }

@@ -100,7 +100,7 @@ test("PixGo recovers create by external_id", async () => {
   }
 });
 
-test("MisticPay creates charge using CI/CS and PiXBrasil paymentIntentId", async () => {
+test("MisticPay creates charge using access-key Basic auth and PiXBrasil paymentIntentId", async () => {
   let seenHeaders: Headers | undefined;
   let seenBody: Record<string, unknown> = {};
 
@@ -118,14 +118,18 @@ test("MisticPay creates charge using CI/CS and PiXBrasil paymentIntentId", async
 
   const adapter = new MisticPayAdapter(mockFetch);
   const result = await adapter.createCharge(input, {
-    ci: "ci-test",
-    cs: "cs-test",
+    clientId: "pk_test",
+    clientSecret: "sk_test",
     baseUrl: "https://mistic.test/api",
   });
 
   assert.equal(result.kind, "CREATED");
-  assert.equal(seenHeaders?.get("ci"), "ci-test");
-  assert.equal(seenHeaders?.get("cs"), "cs-test");
+  assert.equal(
+    seenHeaders?.get("Authorization"),
+    "Basic " + Buffer.from("pk_test:sk_test").toString("base64"),
+  );
+  assert.equal(seenHeaders?.get("ci"), null);
+  assert.equal(seenHeaders?.get("cs"), null);
   assert.equal(seenBody.transactionId, input.paymentIntentId);
 });
 
@@ -136,8 +140,8 @@ test("MisticPay network failure is ambiguous and not safe for blind failover", a
 
   const adapter = new MisticPayAdapter(mockFetch);
   const result = await adapter.createCharge(input, {
-    ci: "ci-test",
-    cs: "cs-test",
+    clientId: "pk_test",
+    clientSecret: "sk_test",
   });
 
   assert.equal(result.kind, "AMBIGUOUS");
@@ -164,10 +168,64 @@ test("MisticPay webhook verification rechecks transaction S2S", async () => {
   const verified = await adapter.verifyWebhook(
     { transactionId: "mistic-transaction-1" },
     {},
-    { ci: "ci-test", cs: "cs-test", baseUrl: "https://mistic.test/api" },
+    {
+      clientId: "pk_test",
+      clientSecret: "sk_test",
+      baseUrl: "https://mistic.test/api",
+    },
   );
 
   assert.equal(seenPath, "https://mistic.test/api/transactions/check");
   assert.equal(seenBody.transactionId, "mistic-transaction-1");
   assert.equal(adapter.mapProviderStatus(verified), "SUCCEEDED");
+});
+
+
+test("MisticPay health check uses harmless account info endpoint", async () => {
+  let seenUrl = "";
+  let seenAuthorization = "";
+
+  const mockFetch = (async (
+    resource: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    seenUrl = String(resource);
+    seenAuthorization = new Headers(init?.headers).get("Authorization") ?? "";
+    return jsonResponse({
+      name: "PiXBrasil",
+      accountVerified: true,
+    });
+  }) as typeof fetch;
+
+  const adapter = new MisticPayAdapter(mockFetch);
+  const result = await adapter.healthCheck({
+    clientId: "pk_test",
+    clientSecret: "sk_test",
+    baseUrl: "https://mistic.test/api",
+  });
+
+  assert.equal(result.status, "HEALTHY");
+  assert.equal(seenUrl, "https://mistic.test/api/users/info");
+  assert.equal(
+    seenAuthorization,
+    "Basic " + Buffer.from("pk_test:sk_test").toString("base64"),
+  );
+});
+
+test("PixGo health check performs a non-creating external_id search", async () => {
+  let seenUrl = "";
+
+  const mockFetch = (async (resource: string | URL | Request) => {
+    seenUrl = String(resource);
+    return jsonResponse({ success: true, data: [], total: 0 });
+  }) as typeof fetch;
+
+  const adapter = new PixGoAdapter(mockFetch);
+  const result = await adapter.healthCheck({
+    apiKey: "pk_test",
+    baseUrl: "https://pixgo.test/api/v1",
+  });
+
+  assert.equal(result.status, "HEALTHY");
+  assert.match(seenUrl, /external_id=__pixbrasil_healthcheck__/);
 });

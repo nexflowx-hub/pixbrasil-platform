@@ -1,9 +1,46 @@
-import { Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { createHash, randomUUID } from "node:crypto";
+import type { AdminContext } from "../auth/admin-auth.types";
 import { DatabaseService } from "../database/database.service";
+import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
+
+interface GatewayConnectionRow {
+  connection_id: string;
+  alias: string;
+  provider_id: string;
+  provider_code: string;
+  provider_account_id: string;
+  decrypted_secret?: string | null;
+}
+
+function requiredString(
+  value: unknown,
+  label: string,
+  prefix?: string,
+): string {
+  const result = String(value ?? "").trim();
+  if (!result) {
+    throw new BadRequestException(`${label} is required.`);
+  }
+  if (prefix && !result.startsWith(prefix)) {
+    throw new BadRequestException(
+      `${label} must start with ${prefix}.`,
+    );
+  }
+  return result;
+}
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly providers: ProviderAdapterRegistry,
+  ) {}
 
   async listProviders() {
     const result = await this.database.query(
@@ -47,6 +84,390 @@ export class AdminService {
     );
 
     return { success: true, data: result.rows };
+  }
+
+  async providerControlPlane() {
+    const result = await this.database.query(
+      `
+      select
+        p.id as provider_id,
+        p.code as provider_code,
+        p.name as provider_name,
+        p.status::text as provider_status,
+        pa.id as provider_account_id,
+        pa.label as provider_account_label,
+        pa.status as provider_account_status,
+        gc.id as gateway_connection_id,
+        gc.alias as gateway_alias,
+        gc.environment,
+        gc.status as connection_status,
+        gc.capabilities,
+        gc.limits,
+        gc.metadata as connection_metadata,
+        exists(
+          select 1
+          from controlplane.provider_credential_versions pcv
+          where pcv.gateway_connection_id = gc.id
+            and pcv.status = 'ACTIVE'
+        ) as has_credentials,
+        (
+          select pcv.fingerprint
+          from controlplane.provider_credential_versions pcv
+          where pcv.gateway_connection_id = gc.id
+            and pcv.status = 'ACTIVE'
+          order by pcv.created_at desc
+          limit 1
+        ) as credential_fingerprint,
+        (
+          select pcv.created_at
+          from controlplane.provider_credential_versions pcv
+          where pcv.gateway_connection_id = gc.id
+            and pcv.status = 'ACTIVE'
+          order by pcv.created_at desc
+          limit 1
+        ) as credential_created_at,
+        rr.id as routing_route_id,
+        rr.enabled as route_enabled,
+        rr.priority as route_priority,
+        rp.id as routing_policy_id,
+        rp.name as routing_policy_name,
+        rp.activation_mode,
+        rp.status as routing_policy_status
+      from public.providers p
+      left join public.provider_accounts pa
+        on pa.provider_id = p.id
+       and coalesce(pa.metadata->>'product','') = 'PIXBRASIL'
+      left join pixbrasil.gateway_connections gc
+        on gc.provider_account_id = pa.id
+      left join pixbrasil.routing_routes rr
+        on rr.gateway_connection_id = gc.id
+      left join pixbrasil.routing_policies rp
+        on rp.id = rr.policy_id
+      where p.code in ('PIXGO','MISTICPAY')
+      order by p.code, pa.created_at, gc.alias
+      `,
+    );
+
+    const flag = await this.database.query(
+      `
+      select enabled
+      from controlplane.feature_flags
+      where key='routing_enforcement'
+      `,
+    );
+
+    return {
+      success: true,
+      data: {
+        connections: result.rows,
+        routingEnforcement: Boolean(flag.rows[0]?.enabled),
+      },
+    };
+  }
+
+  async saveProviderCredentials(
+    connectionId: string,
+    body: Record<string, unknown>,
+    admin: AdminContext,
+  ) {
+    const connection = await this.loadConnection(connectionId);
+    const credentials = this.normalizeCredentials(
+      connection.provider_code,
+      body,
+    );
+    const serialized = JSON.stringify(credentials);
+    const fingerprint = createHash("sha256")
+      .update(`${connection.provider_code}:${serialized}`)
+      .digest("hex");
+    const secretName =
+      `pixbrasil_${connection.alias}_` +
+      `${Date.now()}_${randomUUID().slice(0, 8)}`;
+
+    const result = await this.database.query(
+      `
+      with created_secret as (
+        select vault.create_secret(
+          $1::text,
+          $2::text,
+          $3::text
+        ) as vault_secret_id
+      ),
+      superseded as (
+        update controlplane.provider_credential_versions
+        set status='SUPERSEDED',
+            revoked_at=now()
+        where gateway_connection_id=$4::uuid
+          and status='ACTIVE'
+        returning id
+      ),
+      updated_connection as (
+        update pixbrasil.gateway_connections
+        set vault_secret_id=(select vault_secret_id from created_secret),
+            metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'credentialState','STORED',
+              'lifecycleState','CREDENTIALS_STORED',
+              'routingEligible',false,
+              'credentialsUpdatedAt',now()
+            ),
+            status='DISABLED',
+            updated_at=now()
+        where id=$4::uuid
+        returning id
+      ),
+      updated_account as (
+        update public.provider_accounts
+        set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'credentialState','STORED',
+              'lifecycleState','CREDENTIALS_STORED'
+            ),
+            updated_at=now()
+        where id=$5::uuid
+        returning id
+      )
+      insert into controlplane.provider_credential_versions(
+        provider_account_id,
+        gateway_connection_id,
+        vault_secret_id,
+        fingerprint,
+        status,
+        created_by,
+        rotated_from_id,
+        metadata
+      )
+      select
+        $5::uuid,
+        $4::uuid,
+        cs.vault_secret_id,
+        $6::varchar,
+        'ACTIVE',
+        $7::uuid,
+        (select id from superseded limit 1),
+        jsonb_build_object(
+          'providerCode',$8::text,
+          'gatewayAlias',$9::text,
+          'storage','SUPABASE_VAULT',
+          'secretReturnedToClient',false
+        )
+      from created_secret cs
+      returning id, fingerprint, created_at
+      `,
+      [
+        serialized,
+        secretName,
+        `PiXBrasil provider credentials for ${connection.alias}`,
+        connection.connection_id,
+        connection.provider_account_id,
+        fingerprint,
+        admin.authUserId,
+        connection.provider_code,
+        connection.alias,
+      ],
+    );
+
+    return {
+      success: true,
+      data: {
+        gatewayConnectionId: connection.connection_id,
+        alias: connection.alias,
+        providerCode: connection.provider_code,
+        credentialVersionId: result.rows[0]?.id,
+        fingerprint,
+        state: "STORED",
+      },
+    };
+  }
+
+  async testGatewayConnection(connectionId: string) {
+    const connection = await this.loadConnection(connectionId, true);
+    if (!connection.decrypted_secret) {
+      throw new BadRequestException(
+        "Provider credentials have not been stored in Vault.",
+      );
+    }
+
+    let credentials: unknown;
+    try {
+      credentials = JSON.parse(connection.decrypted_secret);
+    } catch {
+      throw new BadRequestException(
+        "Stored provider credentials are not valid JSON.",
+      );
+    }
+
+    const adapter = this.providers.get(connection.provider_code);
+    const health = await adapter.healthCheck(credentials);
+    const validated = health.status === "HEALTHY";
+
+    await this.database.query(
+      `
+      with updated_connection as (
+        update pixbrasil.gateway_connections
+        set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'credentialState',$2::text,
+              'lifecycleState',$3::text,
+              'routingEligible',false,
+              'lastConnectionTestAt',now(),
+              'lastConnectionHealth',$4::text,
+              'lastConnectionLatencyMs',$5::int,
+              'lastConnectionDetail',$6::text
+            ),
+            status='DISABLED',
+            updated_at=now()
+        where id=$1::uuid
+        returning id
+      ),
+      updated_account as (
+        update public.provider_accounts
+        set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'credentialState',$2::text,
+              'lifecycleState',$3::text,
+              'lastConnectionTestAt',now()
+            ),
+            updated_at=now()
+        where id=$7::uuid
+        returning id
+      )
+      select
+        (select count(*) from updated_connection)::int as connections_updated,
+        (select count(*) from updated_account)::int as accounts_updated
+      `,
+      [
+        connection.connection_id,
+        validated ? "VALIDATED" : "INVALID",
+        validated ? "READY_FOR_SHADOW" : "CREDENTIAL_TEST_FAILED",
+        health.status,
+        health.latencyMs,
+        health.detail ?? null,
+        connection.provider_account_id,
+      ],
+    );
+
+    return {
+      success: true,
+      data: {
+        gatewayConnectionId: connection.connection_id,
+        alias: connection.alias,
+        providerCode: connection.provider_code,
+        health,
+        credentialState: validated ? "VALIDATED" : "INVALID",
+        readyForShadow: validated,
+      },
+    };
+  }
+
+  async promoteGatewayToShadow(connectionId: string) {
+    const connection = await this.database.query<{
+      connection_id: string;
+      provider_id: string;
+      provider_account_id: string;
+      alias: string;
+      provider_code: string;
+      credential_state: string | null;
+      vault_secret_id: string | null;
+    }>(
+      `
+      select
+        gc.id as connection_id,
+        gc.provider_id,
+        gc.provider_account_id,
+        gc.alias,
+        p.code as provider_code,
+        gc.metadata->>'credentialState' as credential_state,
+        gc.vault_secret_id
+      from pixbrasil.gateway_connections gc
+      join public.providers p on p.id=gc.provider_id
+      where gc.id=$1::uuid
+      `,
+      [connectionId],
+    );
+
+    const row = connection.rows[0];
+    if (!row) throw new NotFoundException("Gateway connection not found.");
+    if (!row.vault_secret_id || row.credential_state !== "VALIDATED") {
+      throw new ConflictException(
+        "Gateway must have validated Vault credentials before SHADOW promotion.",
+      );
+    }
+
+    const enforcement = await this.database.query<{ enabled: boolean }>(
+      `
+      select enabled
+      from controlplane.feature_flags
+      where key='routing_enforcement'
+      `,
+    );
+    if (enforcement.rows[0]?.enabled) {
+      throw new ConflictException(
+        "Global routing enforcement must remain disabled during SHADOW promotion.",
+      );
+    }
+
+    await this.database.query(
+      `
+      with updated_connection as (
+        update pixbrasil.gateway_connections
+        set status='ACTIVE',
+            metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'activationMode','SHADOW',
+              'lifecycleState','SHADOW',
+              'routingEligible',true,
+              'shadowActivatedAt',now()
+            ),
+            updated_at=now()
+        where id=$1::uuid
+        returning id
+      ),
+      updated_account as (
+        update public.provider_accounts
+        set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'lifecycleState','SHADOW'
+            ),
+            updated_at=now()
+        where id=$2::uuid
+        returning id
+      ),
+      updated_provider as (
+        update public.providers
+        set status='ACTIVE',
+            updated_at=now()
+        where id=$3::uuid
+        returning id
+      ),
+      updated_routes as (
+        update pixbrasil.routing_routes rr
+        set enabled=true,
+            updated_at=now()
+        from pixbrasil.routing_policies rp
+        where rr.policy_id=rp.id
+          and rr.gateway_connection_id=$1::uuid
+          and rp.activation_mode='SHADOW'
+          and rp.status='ACTIVE'
+        returning rr.id
+      )
+      select
+        (select count(*) from updated_connection)::int as connections_updated,
+        (select count(*) from updated_account)::int as accounts_updated,
+        (select count(*) from updated_provider)::int as providers_updated,
+        (select count(*) from updated_routes)::int as routes_updated
+      `,
+      [
+        row.connection_id,
+        row.provider_account_id,
+        row.provider_id,
+      ],
+    );
+
+    return {
+      success: true,
+      data: {
+        gatewayConnectionId: row.connection_id,
+        alias: row.alias,
+        providerCode: row.provider_code,
+        connectionStatus: "ACTIVE",
+        activationMode: "SHADOW",
+        routingEnforcement: false,
+      },
+    };
   }
 
   async routingOverview() {
@@ -131,5 +552,90 @@ export class AdminService {
     );
 
     return { success: true, data: result.rows };
+  }
+
+  private normalizeCredentials(
+    providerCode: string,
+    body: Record<string, unknown>,
+  ): Record<string, string> {
+    if (providerCode === "PIXGO") {
+      const apiKey = requiredString(body.apiKey, "PixGo API key", "pk_");
+      const webhookSecret = String(body.webhookSecret ?? "").trim();
+      if (webhookSecret && !webhookSecret.startsWith("whsec_")) {
+        throw new BadRequestException(
+          "PixGo webhook secret must start with whsec_.",
+        );
+      }
+
+      return {
+        apiKey,
+        ...(webhookSecret ? { webhookSecret } : {}),
+      };
+    }
+
+    if (providerCode === "MISTICPAY") {
+      return {
+        clientId: requiredString(
+          body.clientId,
+          "MisticPay access key ID",
+          "pk_",
+        ),
+        clientSecret: requiredString(
+          body.clientSecret,
+          "MisticPay access key secret",
+          "sk_",
+        ),
+      };
+    }
+
+    throw new BadRequestException(
+      `Credential schema is not defined for provider ${providerCode}.`,
+    );
+  }
+
+  private async loadConnection(
+    connectionId: string,
+    includeSecret = false,
+  ): Promise<GatewayConnectionRow> {
+    const result = await this.database.query<GatewayConnectionRow>(
+      includeSecret
+        ? `
+          select
+            gc.id as connection_id,
+            gc.alias,
+            gc.provider_id,
+            p.code as provider_code,
+            gc.provider_account_id,
+            v.decrypted_secret
+          from pixbrasil.gateway_connections gc
+          join public.providers p on p.id=gc.provider_id
+          left join vault.decrypted_secrets v on v.id=gc.vault_secret_id
+          where gc.id=$1::uuid
+          `
+        : `
+          select
+            gc.id as connection_id,
+            gc.alias,
+            gc.provider_id,
+            p.code as provider_code,
+            gc.provider_account_id
+          from pixbrasil.gateway_connections gc
+          join public.providers p on p.id=gc.provider_id
+          where gc.id=$1::uuid
+          `,
+      [connectionId],
+    );
+
+    const connection = result.rows[0];
+    if (!connection) {
+      throw new NotFoundException("Gateway connection not found.");
+    }
+    if (!connection.provider_account_id) {
+      throw new ConflictException(
+        "Gateway connection is not bound to a provider account.",
+      );
+    }
+
+    return connection;
   }
 }

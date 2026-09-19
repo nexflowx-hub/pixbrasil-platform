@@ -279,3 +279,174 @@ td strong { color:#c9d8d5; }
 .recovery-success span { display: block; }
 .recovery-success strong { font-size: 12px; }
 .recovery-success span { margin-top: 4px; color: #8fa8a2; font-size: 10px; line-height: 1.55; }
+
+.provider-control-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.provider-control-card {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(8,24,25,.94), rgba(4,15,16,.96));
+  overflow: hidden;
+}
+.provider-control-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  padding: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.provider-identity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.provider-identity h2 {
+  margin: 3px 0 2px;
+  font-size: 19px;
+  letter-spacing: -.035em;
+}
+.provider-identity p {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 10px;
+}
+.provider-state-stack {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.provider-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 1px;
+  background: rgba(74,224,190,.07);
+}
+.provider-fact {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 68px;
+  padding: 13px 16px;
+  background: rgba(5,17,18,.96);
+}
+.provider-fact > svg { color: var(--muted-2); }
+.provider-fact span,
+.provider-fact strong { display: block; }
+.provider-fact span {
+  color: var(--muted-2);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.provider-fact strong {
+  color: #a9bbb7;
+  font-size: 9px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+.provider-fact strong.fact-good { color: var(--green); }
+.credential-fingerprint {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: 16px 18px 0;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #041112;
+}
+.credential-fingerprint > svg { color: var(--aqua); }
+.credential-fingerprint span,
+.credential-fingerprint code { display: block; }
+.credential-fingerprint span {
+  color: var(--muted-2);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.credential-fingerprint code {
+  margin-top: 3px;
+  color: #a9c0ba;
+  font-size: 9px;
+}
+.provider-credential-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 13px;
+  padding: 17px 18px 12px;
+}
+.provider-credential-form label {
+  display: grid;
+  gap: 7px;
+  color: #9bb0ab;
+  font-size: 9px;
+  font-weight: 700;
+}
+.provider-credential-form input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  background: #031011;
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 11px;
+}
+.provider-credential-form input:focus {
+  border-color: rgba(33,242,154,.45);
+  box-shadow: 0 0 0 3px rgba(33,242,154,.06);
+}
+.provider-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 3px;
+}
+.compact-action {
+  padding: 0 14px;
+  min-height: 38px;
+}
+.provider-actions .secondary-button {
+  min-height: 38px;
+  font-size: 9px;
+}
+.provider-actions .primary-button {
+  font-size: 9px;
+}
+.provider-security-note {
+  margin: 0;
+  padding: 0 18px 18px;
+  color: var(--muted-2);
+  font-size: 8px;
+  line-height: 1.55;
+}
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(33,242,154,.20);
+  background: rgba(33,242,154,.055);
+  color: #93e7c4;
+  border-radius: 11px;
+  padding: 10px 12px;
+  font-size: 11px;
+}
+@media (max-width: 1080px) {
+  .provider-control-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .provider-control-head { flex-direction: column; }
+  .provider-state-stack { justify-content: flex-start; }
+  .provider-facts { grid-template-columns: 1fr; }
+  .provider-credential-form { grid-template-columns: 1fr; }
+  .provider-actions { flex-direction: column; }
+  .provider-actions button { width: 100%; }
+}

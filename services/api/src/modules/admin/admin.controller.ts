@@ -1,6 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
+  Param,
+  Post,
+  Put,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -27,6 +31,42 @@ export class AdminController {
   @RequirePermissions("providers.read")
   providers() {
     return this.admin.listProviders();
+  }
+
+  @Get("provider-control-plane")
+  @RequirePermissions("providers.read")
+  providerControlPlane() {
+    return this.admin.providerControlPlane();
+  }
+
+  @Put("gateway-connections/:connectionId/credentials")
+  @RequirePermissions("providers.credentials.rotate")
+  saveProviderCredentials(
+    @Param("connectionId") connectionId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.saveProviderCredentials(
+      connectionId,
+      body,
+      request.adminContext!,
+    );
+  }
+
+  @Post("gateway-connections/:connectionId/test")
+  @RequirePermissions("providers.manage")
+  testGatewayConnection(
+    @Param("connectionId") connectionId: string,
+  ) {
+    return this.admin.testGatewayConnection(connectionId);
+  }
+
+  @Post("gateway-connections/:connectionId/promote-shadow")
+  @RequirePermissions("providers.manage")
+  promoteGatewayToShadow(
+    @Param("connectionId") connectionId: string,
+  ) {
+    return this.admin.promoteGatewayToShadow(connectionId);
   }
 
   @Get("routing/overview")
