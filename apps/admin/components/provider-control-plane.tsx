@@ -84,8 +84,27 @@ export function ProviderControlPlane({
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+
+    adminFetch<ControlResponse>("/api/v1/admin/provider-control-plane")
+      .then((response) => {
+        if (!active) return;
+        setPayload(response.data);
+        setError("");
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Não foi possível carregar o Provider Control Plane.",
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const rows = useMemo(
     () => payload?.connections.filter((row) => row.gateway_connection_id) ?? [],
