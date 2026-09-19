@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
 import type { NormalizedProviderStatus } from "../providers/provider-adapter";
+import { MerchantWebhooksService } from "../merchant-webhooks/merchant-webhooks.service";
 
 interface MisticWebhookPayload {
   transactionId?: string | number;
@@ -26,6 +27,7 @@ export class WebhooksService {
   constructor(
     private readonly database: DatabaseService,
     private readonly providers: ProviderAdapterRegistry,
+    private readonly merchantWebhooks: MerchantWebhooksService,
   ) {}
 
   async handleMisticPay(
@@ -89,12 +91,19 @@ export class WebhooksService {
       payload: redactedPayload,
     });
 
-    await this.applyVerifiedPaymentStatus(
+    const payment = await this.applyVerifiedPaymentStatus(
       connection.connection_id,
       transactionId,
       verifiedStatus,
       "MISTICPAY",
     );
+
+    if (payment && !persisted.replay) {
+      await this.merchantWebhooks.deliverPaymentEvent(
+        this.toMerchantEventType(payment.status),
+        payment,
+      );
+    }
 
     return {
       success: true,
@@ -193,12 +202,19 @@ export class WebhooksService {
       payload: redactedPayload,
     });
 
-    await this.applyVerifiedPaymentStatus(
+    const payment = await this.applyVerifiedPaymentStatus(
       connection.connection_id,
       paymentId,
       verifiedStatus,
       "PIXGO",
     );
+
+    if (payment && !persisted.replay) {
+      await this.merchantWebhooks.deliverPaymentEvent(
+        this.toMerchantEventType(payment.status),
+        payment,
+      );
+    }
 
     return {
       success: true,
@@ -310,7 +326,16 @@ export class WebhooksService {
 
     if (!paymentStatus) return;
 
-    await this.database.query(
+    const result = await this.database.query<{
+      payment_intent_id: string;
+      merchant_id: string;
+      reference: string | null;
+      amount: string;
+      currency: string;
+      status: string;
+      store_code: string | null;
+      completed_at: string | null;
+    }>(
       `
       with matched_attempt as (
         select pa.id,pa.payment_intent_id
@@ -330,24 +355,69 @@ export class WebhooksService {
               )
         where pa.id=(select id from matched_attempt)
         returning pa.id
+      ),
+      updated_intent as (
+        update pixbrasil.payment_intents pi
+        set status=$5::text,
+            completed_at=case
+              when $5::text='SUCCEEDED' then coalesce(pi.completed_at,now())
+              else pi.completed_at
+            end,
+            metadata=coalesce(pi.metadata,'{}'::jsonb) ||
+              jsonb_build_object(
+                'lastVerifiedProviderStatus',$3::text,
+                'lastVerifiedProvider',$4::text,
+                'lastWebhookAt',now()
+              ),
+            updated_at=now()
+        where pi.id=(select payment_intent_id from matched_attempt)
+        returning
+          pi.id,
+          pi.merchant_id,
+          pi.store_id,
+          pi.external_reference,
+          pi.amount,
+          pi.currency,
+          pi.status,
+          pi.completed_at
       )
-      update pixbrasil.payment_intents pi
-      set status=$5::text,
-          completed_at=case
-            when $5::text='SUCCEEDED' then coalesce(pi.completed_at,now())
-            else pi.completed_at
-          end,
-          metadata=coalesce(pi.metadata,'{}'::jsonb) ||
-            jsonb_build_object(
-              'lastVerifiedProviderStatus',$3::text,
-              'lastVerifiedProvider',$4::text,
-              'lastWebhookAt',now()
-            ),
-          updated_at=now()
-      where pi.id=(select payment_intent_id from matched_attempt)
+      select
+        ui.id as payment_intent_id,
+        ui.merchant_id,
+        ui.external_reference as reference,
+        ui.amount::text,
+        ui.currency,
+        ui.status,
+        s.code as store_code,
+        ui.completed_at::text
+      from updated_intent ui
+      left join pixbrasil.stores s on s.id=ui.store_id
       `,
       [connectionId, providerPaymentId, status, providerCode, paymentStatus],
     );
+
+    const row = result.rows[0];
+    if (!row) return null;
+
+    return {
+      paymentIntentId: row.payment_intent_id,
+      merchantId: row.merchant_id,
+      reference: row.reference,
+      amount: Number(row.amount),
+      currency: row.currency,
+      status: row.status,
+      storeCode: row.store_code,
+      providerCode,
+      providerPaymentId,
+      completedAt: row.completed_at,
+    };
+  }
+
+  private toMerchantEventType(status: string) {
+    if (status === "SUCCEEDED") return "payment.succeeded" as const;
+    if (status === "FAILED") return "payment.failed" as const;
+    if (status === "CANCELED") return "payment.canceled" as const;
+    return "payment.pending" as const;
   }
 
   private headerValue(
