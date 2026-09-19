@@ -16,6 +16,8 @@ const context: RoutingContext = {
   paymentMethod: "PIX",
   policyId: "policy-1",
   policyVersion: 3,
+  environment: "PRODUCTION",
+  riskLevel: "LOW",
 };
 
 function route(
@@ -75,6 +77,40 @@ test("filters amount, tier, account type, health and volume constraints", () => 
       "BELOW_MIN_AMOUNT",
       "DAILY_VOLUME_CAP",
       "MONTHLY_VOLUME_CAP",
+    ]),
+  );
+});
+
+
+test("filters provider/account state, capability, environment, risk and telemetry thresholds", () => {
+  const result = evaluateRouting(
+    context,
+    [
+      route({ connectionId: "ok", providerCode: "PIXGO", environment: "PRODUCTION", supportsPixBrl: true }),
+      route({ connectionId: "provider-disabled", providerCode: "PIXGO", providerStatus: "DISABLED" }),
+      route({ connectionId: "account-disabled", providerCode: "MISTICPAY", providerAccountStatus: "DISABLED" }),
+      route({ connectionId: "capability", providerCode: "PIXGO", supportsPixBrl: false }),
+      route({ connectionId: "environment", providerCode: "PIXGO", environment: "SANDBOX" }),
+      route({ connectionId: "risk", providerCode: "MISTICPAY", allowedRiskLevels: ["MEDIUM"] }),
+      route({ connectionId: "error-rate", providerCode: "PIXGO", errorRate: 0.12, maxErrorRate: 0.05 }),
+      route({ connectionId: "latency", providerCode: "MISTICPAY", p95LatencyMs: 1800, maxP95LatencyMs: 1200 }),
+      route({ connectionId: "tags", providerCode: "PIXGO", tags: ["business"], requiredTags: ["enterprise"] }),
+    ],
+    "RULES",
+  );
+
+  assert.equal(result.selected?.connectionId, "ok");
+  assert.deepEqual(
+    new Set(result.rejected.map((entry) => entry.reason)),
+    new Set([
+      "PROVIDER_DISABLED",
+      "PROVIDER_ACCOUNT_DISABLED",
+      "CAPABILITY_NOT_SUPPORTED",
+      "ENVIRONMENT_MISMATCH",
+      "RISK_LEVEL_NOT_ALLOWED",
+      "ERROR_RATE_LIMIT",
+      "LATENCY_LIMIT",
+      "REQUIRED_TAG_MISSING",
     ]),
   );
 });

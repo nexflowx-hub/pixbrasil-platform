@@ -3,25 +3,64 @@
   "short_name": "PiXBrasil",
   "description": "Experiência brasileira para PIX e ativos digitais, atualmente em fase de pré-lançamento.",
   "id": "/",
-  "start_url": "/?source=pwa",
+  "start_url": "/app?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
   "background_color": "#02090B",
   "theme_color": "#02090B",
   "lang": "pt-BR",
   "dir": "ltr",
-  "categories": ["finance", "business"],
+  "categories": [
+    "finance",
+    "business"
+  ],
   "icons": [
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "shortcuts": [
-    { "name": "Para Você", "short_name": "Pessoal", "url": "/personal?source=pwa" },
-    { "name": "Empresas", "short_name": "Business", "url": "/business?source=pwa" },
-    { "name": "Como funciona", "short_name": "Fluxo", "url": "/how-it-works?source=pwa" }
+    {
+      "name": "Abrir app demo",
+      "short_name": "App",
+      "url": "/app?source=pwa"
+    },
+    {
+      "name": "Para Você",
+      "short_name": "Pessoal",
+      "url": "/personal?source=pwa"
+    },
+    {
+      "name": "Empresas",
+      "short_name": "Business",
+      "url": "/business?source=pwa"
+    }
   ]
 }

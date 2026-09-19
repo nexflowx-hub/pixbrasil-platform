@@ -223,3 +223,61 @@ A tier may influence:
 5. Review decision evidence/health/volume behavior.
 6. Enable controlled ENFORCED routing for a limited scope.
 7. Expand only after reconciliation and idempotency behavior is stable.
+
+## Routing management V2
+
+Routing is managed at two distinct levels.
+
+### Provider-account global profile
+
+Each commercial provider account may have an operational profile independent
+of any one merchant/store policy:
+
+- status: ACTIVE / DEGRADED / DISABLED
+- environment
+- minimum/maximum ticket
+- daily/monthly global volume caps
+- provider cost (bps + fixed)
+- allowed PF/PJ account types
+- allowed customer tiers
+- allowed risk levels
+- operational tags
+
+This prevents the same PixGo/MisticPay account from exceeding a contractual or
+risk limit when reused by multiple gateway connections.
+
+### Route-specific policy
+
+A routing route remains the policy-specific overlay:
+
+- priority
+- weight
+- amount range
+- tier/account-type restriction
+- connection-level daily/monthly caps
+- health/error/latency thresholds
+- cost overrides
+- custom conditions
+
+Effective eligibility is the intersection of:
+
+```text
+Provider
+∩ Provider Account Profile
+∩ Gateway Connection
+∩ Routing Policy
+∩ Routing Route
+∩ Real-time Health/Volume Evidence
+```
+
+### Management library
+
+The admin model should expose four separate libraries:
+
+1. Providers — integration definitions (PixGo, MisticPay, future providers)
+2. Provider Accounts — commercial/API accounts opened with each provider
+3. Gateway Connections — usable runtime bindings to vault credentials/scopes
+4. Routing Policies — rule sets that select among connections
+
+A provider can therefore have many accounts, and an account can support many
+scoped connections without duplicating credentials.
