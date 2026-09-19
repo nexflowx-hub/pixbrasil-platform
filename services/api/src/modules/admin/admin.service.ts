@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { AdminContext } from "../auth/admin-auth.types";
 import { DatabaseService } from "../database/database.service";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
@@ -466,6 +466,237 @@ export class AdminService {
         connectionStatus: "ACTIVE",
         activationMode: "SHADOW",
         routingEnforcement: false,
+      },
+    };
+  }
+
+  async listMerchants() {
+    const result = await this.database.query(
+      `
+      select
+        m.id,
+        m.account_id,
+        m.status,
+        m.tier_code,
+        m.legal_name,
+        m.trade_name,
+        m.metadata,
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'id', s.id,
+              'code', s.code,
+              'name', s.name,
+              'status', s.status,
+              'currency', s.currency,
+              'routeCostProfile', rcp.code,
+              'releaseProfile', rel.code,
+              'releaseClass', rel.release_class,
+              'platformFeeProfile', fp.code,
+              'crossReleaseClassFailover', sfp.allow_cross_release_class_failover,
+              'routingPolicy', rp.name,
+              'routingMode', rp.activation_mode,
+              'gatewayAlias', gc.alias
+            )
+            order by s.code
+          ) filter (where s.id is not null),
+          '[]'::jsonb
+        ) as stores
+      from pixbrasil.merchants m
+      left join pixbrasil.stores s on s.merchant_id=m.id
+      left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
+      left join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
+      left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
+      left join pixbrasil.fee_profiles fp on fp.id=sfp.fee_profile_id
+      left join lateral (
+        select rp0.*
+        from pixbrasil.routing_policies rp0
+        where rp0.store_id=s.id
+          and rp0.status='ACTIVE'
+        order by rp0.priority asc, rp0.version desc
+        limit 1
+      ) rp on true
+      left join lateral (
+        select gc0.*
+        from pixbrasil.routing_routes rr0
+        join pixbrasil.gateway_connections gc0 on gc0.id=rr0.gateway_connection_id
+        where rr0.policy_id=rp.id
+          and rr0.enabled=true
+        order by rr0.priority asc
+        limit 1
+      ) gc on true
+      group by m.id
+      order by m.created_at desc
+      `,
+    );
+
+    return { success: true, data: result.rows };
+  }
+
+  async listMerchantApiKeys(merchantId: string) {
+    const result = await this.database.query(
+      `
+      select
+        k.id,
+        k.name,
+        k.key_prefix,
+        k.scopes,
+        k.status,
+        k.expires_at,
+        k.last_used_at,
+        k.created_at,
+        coalesce(
+          array_agg(s.code order by s.code)
+            filter (where s.id is not null),
+          '{}'::varchar[]
+        )::text[] as store_codes
+      from pixbrasil.merchant_api_keys k
+      left join pixbrasil.merchant_api_key_store_grants g on g.api_key_id=k.id
+      left join pixbrasil.stores s on s.id=g.store_id
+      where k.merchant_id=$1::uuid
+      group by k.id
+      order by k.created_at desc
+      `,
+      [merchantId],
+    );
+
+    return { success: true, data: result.rows };
+  }
+
+  async createMerchantApiKey(
+    merchantId: string,
+    body: Record<string, unknown>,
+    admin: AdminContext,
+  ) {
+    const merchantResult = await this.database.query<{
+      id: string;
+      trade_name: string | null;
+    }>(
+      `
+      select id,trade_name
+      from pixbrasil.merchants
+      where id=$1::uuid and status='ACTIVE'
+      `,
+      [merchantId],
+    );
+    const merchant = merchantResult.rows[0];
+    if (!merchant) {
+      throw new NotFoundException("Active merchant not found.");
+    }
+
+    const storesResult = await this.database.query<{
+      id: string;
+      code: string;
+    }>(
+      `
+      select id,code
+      from pixbrasil.stores
+      where merchant_id=$1::uuid and status='ACTIVE'
+      order by code
+      `,
+      [merchantId],
+    );
+
+    const requestedCodes = Array.isArray(body.storeCodes)
+      ? body.storeCodes.map((value) => String(value).trim().toUpperCase()).filter(Boolean)
+      : [];
+
+    const grantedStores = requestedCodes.length
+      ? storesResult.rows.filter((store) => requestedCodes.includes(store.code.toUpperCase()))
+      : storesResult.rows;
+
+    if (!grantedStores.length) {
+      throw new BadRequestException("At least one active store grant is required.");
+    }
+    if (
+      requestedCodes.length &&
+      new Set(grantedStores.map((store) => store.code.toUpperCase())).size !==
+        new Set(requestedCodes).size
+    ) {
+      throw new BadRequestException(
+        "One or more requested stores do not belong to this merchant.",
+      );
+    }
+
+    const name =
+      String(body.name ?? "").trim().slice(0, 120) ||
+      `${merchant.trade_name ?? "Merchant"} S2S`;
+    const plaintext = `pix_live_${randomBytes(32).toString("base64url")}`;
+    const keyHash = createHash("sha256").update(plaintext).digest("hex");
+    const keyPrefix = plaintext.slice(0, 20);
+
+    const inserted = await this.database.query<{ id: string }>(
+      `
+      insert into pixbrasil.merchant_api_keys(
+        merchant_id,name,key_prefix,key_hash,scopes,status,created_by,metadata
+      )
+      values(
+        $1::uuid,$2::varchar,$3::varchar,$4::char(64),
+        ARRAY['payments:create']::text[],'ACTIVE',$5::uuid,
+        jsonb_build_object(
+          'secretReturnedOnce',true,
+          'createdFrom','PIXBRASIL_ADMIN',
+          'mode','LIVE_PILOT_CAPABLE'
+        )
+      )
+      returning id
+      `,
+      [merchantId, name, keyPrefix, keyHash, admin.authUserId],
+    );
+
+    const apiKeyId = inserted.rows[0]?.id;
+    if (!apiKeyId) {
+      throw new ConflictException("Unable to create merchant API key.");
+    }
+
+    for (const store of grantedStores) {
+      await this.database.query(
+        `
+        insert into pixbrasil.merchant_api_key_store_grants(api_key_id,store_id)
+        values($1::uuid,$2::uuid)
+        on conflict do nothing
+        `,
+        [apiKeyId, store.id],
+      );
+    }
+
+    await this.database.query(
+      `
+      insert into public.audit_logs(
+        id,actor_type,actor_user_id,action,resource_type,resource_id,
+        before,after,metadata,created_at
+      )
+      values(
+        gen_random_uuid(),'ADMIN',$1::uuid,'MERCHANT_API_KEY_CREATED',
+        'merchant_api_key',$2::text,null,
+        jsonb_build_object(
+          'merchantId',$3::text,
+          'keyPrefix',$4::text,
+          'storeCodes',$5::jsonb,
+          'secretPersisted',false
+        ),
+        '{}'::jsonb,now()
+      )
+      `,
+      [
+        admin.authUserId,
+        apiKeyId,
+        merchantId,
+        keyPrefix,
+        JSON.stringify(grantedStores.map((store) => store.code)),
+      ],
+    );
+
+    return {
+      success: true,
+      data: {
+        apiKeyId,
+        name,
+        keyPrefix,
+        secret: plaintext,
+        scopes: ["payments:create"],
+        storeCodes: grantedStores.map((store) => store.code),
+        warning: "This secret is shown once and is not recoverable.",
       },
     };
   }
