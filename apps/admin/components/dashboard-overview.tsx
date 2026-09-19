@@ -8,6 +8,7 @@ import {
   Clock3,
   Database,
   GitBranch,
+  Network,
   Radio,
   Server,
   ShieldCheck,
