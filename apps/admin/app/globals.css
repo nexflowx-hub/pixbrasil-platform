@@ -593,3 +593,178 @@ td strong { color:#c9d8d5; }
   .merchant-store-route { justify-content: flex-start; }
   .secret-value-row .secondary-button { width: 100%; }
 }
+
+
+.merchant-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.merchant-summary-card {
+  padding: 15px 16px;
+}
+.merchant-summary-card span,
+.merchant-summary-card strong,
+.merchant-summary-card small { display: block; }
+.merchant-summary-card span {
+  color: var(--muted-2);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.merchant-summary-card strong {
+  margin-top: 5px;
+  font-size: 22px;
+  letter-spacing: -.04em;
+}
+.merchant-summary-card small {
+  margin-top: 3px;
+  color: var(--muted-2);
+  font-size: 8px;
+}
+.merchant-loading,
+.merchant-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 100px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.merchant-empty {
+  flex-direction: column;
+  text-align: center;
+}
+.merchant-empty strong { color: var(--text); font-size: 12px; }
+.merchant-empty span { color: var(--muted-2); }
+.merchant-key-builder {
+  padding: 16px;
+  border-top: 1px solid var(--line);
+  background: rgba(6,22,23,.72);
+}
+.merchant-key-builder-head,
+.merchant-key-builder-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.merchant-key-builder-head > svg { color: var(--aqua); }
+.merchant-key-builder-head strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+.merchant-key-name {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  color: #9bb0ab;
+  font-size: 9px;
+  font-weight: 700;
+}
+.merchant-key-name input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  outline: none;
+  background: #031011;
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 11px;
+}
+.merchant-key-name input:focus {
+  border-color: rgba(33,242,154,.45);
+  box-shadow: 0 0 0 3px rgba(33,242,154,.06);
+}
+.merchant-grants {
+  display: grid;
+  gap: 8px;
+  margin-top: 13px;
+}
+.merchant-grants > span {
+  color: #9bb0ab;
+  font-size: 9px;
+  font-weight: 700;
+}
+.merchant-grant-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 8px;
+}
+.merchant-grant-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #041112;
+  cursor: pointer;
+}
+.merchant-grant-option.selected {
+  border-color: rgba(33,242,154,.30);
+  background: rgba(33,242,154,.045);
+}
+.merchant-grant-option input { accent-color: #21f29a; }
+.merchant-grant-option strong,
+.merchant-grant-option small { display: block; }
+.merchant-grant-option strong { font-size: 9px; }
+.merchant-grant-option small {
+  margin-top: 3px;
+  color: var(--muted-2);
+  font-size: 7px;
+}
+.merchant-key-builder-actions {
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.merchant-key-builder-actions > span {
+  color: var(--muted-2);
+  font-size: 8px;
+}
+.merchant-key-builder-actions code { color: #9adfc6; }
+.merchant-key-main { min-width: 0; flex: 1; }
+.merchant-key-meta {
+  min-width: 128px;
+  text-align: right;
+}
+.merchant-key-row .danger-button { flex: 0 0 auto; }
+.danger-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid rgba(255,107,107,.24);
+  border-radius: 9px;
+  background: rgba(255,107,107,.055);
+  color: #ff9898;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+}
+.danger-button:hover { background: rgba(255,107,107,.10); }
+.danger-button:disabled { opacity: .45; cursor: not-allowed; }
+.merchant-no-keys {
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted-2);
+  font-size: 9px;
+}
+@media (max-width: 760px) {
+  .merchant-summary-grid { grid-template-columns: 1fr; }
+  .merchant-grant-grid { grid-template-columns: 1fr; }
+  .merchant-key-builder-head,
+  .merchant-key-builder-actions,
+  .merchant-key-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .merchant-key-meta {
+    min-width: 0;
+    text-align: left;
+  }
+  .merchant-key-row .danger-button { width: 100%; }
+}

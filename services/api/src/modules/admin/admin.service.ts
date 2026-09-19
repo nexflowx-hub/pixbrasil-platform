@@ -701,6 +701,88 @@ export class AdminService {
     };
   }
 
+  async revokeMerchantApiKey(
+    merchantId: string,
+    apiKeyId: string,
+    admin: AdminContext,
+  ) {
+    const existing = await this.database.query<{
+      id: string;
+      name: string;
+      key_prefix: string;
+      status: string;
+    }>(
+      `
+      select id,name,key_prefix,status
+      from pixbrasil.merchant_api_keys
+      where id=$1::uuid
+        and merchant_id=$2::uuid
+      limit 1
+      `,
+      [apiKeyId, merchantId],
+    );
+
+    const key = existing.rows[0];
+    if (!key) {
+      throw new NotFoundException("Merchant API key not found.");
+    }
+
+    if (key.status !== "REVOKED") {
+      await this.database.query(
+        `
+        update pixbrasil.merchant_api_keys
+        set status='REVOKED',
+            revoked_at=coalesce(revoked_at,now())
+        where id=$1::uuid
+          and merchant_id=$2::uuid
+        `,
+        [apiKeyId, merchantId],
+      );
+
+      await this.database.query(
+        `
+        insert into public.audit_logs(
+          id,actor_type,actor_user_id,action,resource_type,resource_id,
+          before,after,metadata,created_at
+        )
+        values(
+          gen_random_uuid(),'ADMIN',$1::uuid,'MERCHANT_API_KEY_REVOKED',
+          'merchant_api_key',$2::text,
+          jsonb_build_object(
+            'merchantId',$3::text,
+            'status',$4::text,
+            'keyPrefix',$5::text
+          ),
+          jsonb_build_object(
+            'merchantId',$3::text,
+            'status','REVOKED',
+            'keyPrefix',$5::text
+          ),
+          '{}'::jsonb,
+          now()
+        )
+        `,
+        [
+          admin.authUserId,
+          apiKeyId,
+          merchantId,
+          key.status,
+          key.key_prefix,
+        ],
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        apiKeyId,
+        name: key.name,
+        keyPrefix: key.key_prefix,
+        status: "REVOKED",
+      },
+    };
+  }
+
   async routingOverview() {
     const [policies, flags] = await Promise.all([
       this.database.query(
