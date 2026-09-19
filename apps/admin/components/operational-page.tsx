@@ -161,7 +161,7 @@ export function OperationalPage({ kind }: { kind: Kind }) {
   const total = useMemo(() => {
     if (Array.isArray(payload)) return payload.length;
     if (payload && typeof payload === "object") {
-      return Object.values(payload as Record<string, unknown>).reduce(
+      return Object.values(payload as Record<string, unknown>).reduce<number>(
         (sum, value) => sum + (Array.isArray(value) ? value.length : 0),
         0,
       );
