@@ -8,12 +8,12 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common";
-import { MerchantApiKeyGuard } from "../merchant-auth/merchant-api-key.guard";
+import { MerchantWebhookGuard } from "./merchant-webhook.guard";
 import type { MerchantApiRequest } from "../merchant-auth/merchant-auth.types";
 import { MerchantWebhooksService } from "./merchant-webhooks.service";
 
 @Controller("v1/webhook-endpoints")
-@UseGuards(MerchantApiKeyGuard)
+@UseGuards(MerchantWebhookGuard)
 export class MerchantWebhooksController {
   constructor(private readonly webhooks: MerchantWebhooksService) {}
 
