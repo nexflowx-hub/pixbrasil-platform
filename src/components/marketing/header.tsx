@@ -99,7 +99,7 @@ export function SiteHeader() {
             href="/early-access"
             className="btn-cta hidden h-9 items-center whitespace-nowrap rounded-full px-5 text-[13px] font-semibold sm:flex"
           >
-            Solicitar acesso
+            Acesso antecipado
           </Link>
 
           <span
@@ -169,7 +169,7 @@ export function SiteHeader() {
               onClick={close}
               className="btn-cta flex h-11 items-center justify-center rounded-full text-[14px] font-semibold"
             >
-              Solicitar acesso
+              Acesso antecipado
             </Link>
           </div>
           <div className="mt-5 flex items-center gap-2 px-1">
