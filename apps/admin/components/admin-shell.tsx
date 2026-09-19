@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
-  BadgeDollarSign,
   Bell,
   Blocks,
   BookOpenCheck,
@@ -19,14 +18,12 @@ import {
   Landmark,
   LogOut,
   Menu,
-  Network,
   Radar,
   ReceiptText,
   Settings2,
   ShieldCheck,
   Store,
   Users,
-  WalletCards,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
