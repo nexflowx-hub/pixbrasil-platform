@@ -7,7 +7,6 @@ import {
   ArrowUpFromLine,
   Building2,
   CircleDollarSign,
-  Copy,
   GitBranch,
   KeyRound,
   Layers3,
@@ -128,18 +127,6 @@ export function ClientPortal() {
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
 
-  const loadSession = useCallback(async () => {
-    const response = await fetch("/api/client/session", { cache: "no-store" });
-    if (response.status === 401) {
-      router.replace("/login");
-      return;
-    }
-    const payload = (await response.json()) as SessionPayload;
-    if (!response.ok) throw new Error("Não foi possível carregar a sessão.");
-    setSession(payload.data);
-    setAccountId((current) => current || payload.data.accounts[0]?.accountId || "");
-  }, [router]);
-
   const loadOverview = useCallback(async (id: string) => {
     if (!id) return;
     setBusy(true);
@@ -191,7 +178,6 @@ export function ClientPortal() {
   useEffect(() => {
     if (!accountId) return;
     let active = true;
-    setBusy(true);
     fetch("/api/client/accounts/" + encodeURIComponent(accountId) + "/overview", {
       cache: "no-store",
     })
@@ -266,7 +252,10 @@ export function ClientPortal() {
                 return (
                   <button
                     key={account.accountId}
-                    onClick={() => setAccountId(account.accountId)}
+                    onClick={() => {
+                      setBusy(true);
+                      setAccountId(account.accountId);
+                    }}
                     className={[
                       "w-full rounded-2xl border p-3 text-left transition",
                       selected
