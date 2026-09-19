@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Fingerprint,
@@ -48,7 +48,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace(searchParams.get("next") || "/dashboard");
+    router.replace("/dashboard");
   }
 
   return (
