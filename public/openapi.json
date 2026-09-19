@@ -1,0 +1,302 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "PiXBrasil Merchant API",
+    "version": "1.0.0",
+    "description": "Server-side merchant API for PIX PaymentIntents, status and signed webhook endpoints. Live provider execution is controlled per Store."
+  },
+  "servers": [
+    {
+      "url": "https://api.pixbrasil.org/api/v1",
+      "description": "Production"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Payments"
+    },
+    {
+      "name": "Webhooks"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerApiKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "PiXBrasil API Key"
+      }
+    },
+    "schemas": {
+      "Payer": {
+        "type": "object",
+        "required": [
+          "name",
+          "taxId"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "taxId": {
+            "type": "string",
+            "description": "Valid Brazilian CPF or CNPJ."
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "phone": {
+            "type": "string"
+          }
+        }
+      },
+      "CreatePaymentRequest": {
+        "type": "object",
+        "required": [
+          "store",
+          "amount",
+          "reference",
+          "payer"
+        ],
+        "properties": {
+          "store": {
+            "type": "string",
+            "example": "SIGNUM"
+          },
+          "amount": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0.01,
+            "example": 149.9
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "BRL"
+            ],
+            "default": "BRL"
+          },
+          "reference": {
+            "type": "string",
+            "maxLength": 160,
+            "example": "ORDER-8472"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "payer": {
+            "$ref": "#/components/schemas/Payer"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Merchant metadata, max 16KB. Suitable for order IDs and attribution identifiers; never place secrets here."
+          }
+        }
+      },
+      "WebhookEndpointRequest": {
+        "type": "object",
+        "required": [
+          "endpointUrl"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "endpointUrl": {
+            "type": "string",
+            "format": "uri",
+            "example": "https://shop.example.com/api/webhooks/pixbrasil"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "payment.pending",
+                "payment.succeeded",
+                "payment.failed",
+                "payment.canceled"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerApiKey": []
+    }
+  ],
+  "paths": {
+    "/payments/charge": {
+      "post": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Create an idempotent PIX PaymentIntent",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "description": "Stable key for the logical checkout attempt."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PaymentIntent resolved. Stores in SHADOW return SHADOW_ONLY and do not create a real PIX."
+          },
+          "400": {
+            "description": "Invalid request."
+          },
+          "401": {
+            "description": "Invalid API key."
+          },
+          "403": {
+            "description": "Store/scope not granted."
+          },
+          "409": {
+            "description": "Idempotency conflict."
+          }
+        }
+      }
+    },
+    "/payments/{paymentIntentId}": {
+      "get": {
+        "tags": [
+          "Payments"
+        ],
+        "summary": "Read PaymentIntent status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "paymentIntentId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PaymentIntent status and routing/provider summary."
+          },
+          "404": {
+            "description": "Not found or not granted to the API key."
+          }
+        }
+      }
+    },
+    "/webhook-endpoints": {
+      "get": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "List merchant webhook endpoints",
+        "responses": {
+          "200": {
+            "description": "Webhook endpoints without signing secrets."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Register an HTTPS merchant webhook",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookEndpointRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Endpoint created. signingSecret is returned once."
+          },
+          "400": {
+            "description": "Invalid URL/events."
+          },
+          "409": {
+            "description": "Duplicate endpoint."
+          }
+        }
+      }
+    },
+    "/webhook-endpoints/{endpointId}/test": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Send webhook.test to the endpoint",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpointId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Test attempt completed; response includes delivery status."
+          }
+        }
+      }
+    },
+    "/webhook-endpoints/{endpointId}/revoke": {
+      "post": {
+        "tags": [
+          "Webhooks"
+        ],
+        "summary": "Revoke a webhook endpoint",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "endpointId",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Endpoint revoked."
+          },
+          "404": {
+            "description": "Endpoint not found."
+          }
+        }
+      }
+    }
+  }
+}
