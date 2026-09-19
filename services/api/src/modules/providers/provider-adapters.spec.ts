@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { createHmac } from "node:crypto";
 import { test } from "node:test";
 import type { PixCreateChargeInput } from "./provider-adapter";
 import { MisticPayAdapter } from "./misticpay.adapter";
@@ -228,4 +229,72 @@ test("PixGo health check performs a non-creating external_id search", async () =
 
   assert.equal(result.status, "HEALTHY");
   assert.match(seenUrl, /external_id=__pixbrasil_healthcheck__/);
+});
+
+
+test("PixGo webhook requires a valid raw-body HMAC before S2S confirmation", async () => {
+  const payload = {
+    event: "payment.completed",
+    data: { payment_id: "pixgo-payment-1" },
+  };
+  const rawBody = Buffer.from(JSON.stringify(payload));
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const webhookSecret = "whsec_test";
+  const signature = createHmac("sha256", webhookSecret)
+    .update(timestamp + "." + rawBody.toString("utf8"))
+    .digest("hex");
+
+  const mockFetch = (async () =>
+    jsonResponse({
+      data: {
+        payment_id: "pixgo-payment-1",
+        status: "completed",
+      },
+    })) as typeof fetch;
+
+  const adapter = new PixGoAdapter(mockFetch);
+  const verified = await adapter.verifyWebhook(
+    payload,
+    {
+      "x-webhook-timestamp": timestamp,
+      "x-webhook-signature": signature,
+    },
+    {
+      apiKey: "pk_test",
+      webhookSecret,
+      baseUrl: "https://pixgo.test/api/v1",
+    },
+    rawBody,
+  );
+
+  assert.equal(adapter.mapProviderStatus(verified), "SUCCEEDED");
+});
+
+test("PixGo webhook rejects a bad HMAC", async () => {
+  const payload = {
+    event: "payment.completed",
+    data: { payment_id: "pixgo-payment-1" },
+  };
+  const rawBody = Buffer.from(JSON.stringify(payload));
+
+  const adapter = new PixGoAdapter(
+    (async () => jsonResponse({})) as typeof fetch,
+  );
+
+  await assert.rejects(
+    () =>
+      adapter.verifyWebhook(
+        payload,
+        {
+          "x-webhook-timestamp": String(Math.floor(Date.now() / 1000)),
+          "x-webhook-signature": "00".repeat(32),
+        },
+        {
+          apiKey: "pk_test",
+          webhookSecret: "whsec_test",
+        },
+        rawBody,
+      ),
+    /PIXGO_WEBHOOK_SIGNATURE_INVALID/,
+  );
 });

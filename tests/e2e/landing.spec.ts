@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("landing publica carrega sem links vazios e sem overflow horizontal", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Entrada via PIX/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Abrir conta/i })).toHaveAttribute("href", "/early-access");
+  await expect(page.getByRole("link", { name: /Solicitar acesso/i })).toHaveAttribute("href", "/early-access");
   expect(await page.locator('a[href="#"]').count()).toBe(0);
 
   const overflow = await page.evaluate(
@@ -78,4 +78,13 @@ test("health endpoint e web-only", async ({ request }) => {
     component: "landing",
     status: "ONLINE",
   });
+});
+
+
+test("client portal exige sessão e a tela de login é operacional", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page.getByRole("heading", { name: /Entrar no PiXBrasil/i })).toBeVisible();
+
+  await page.goto("/app");
+  await expect(page).toHaveURL(/\/login$/, { timeout: 10_000 });
 });

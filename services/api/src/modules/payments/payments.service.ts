@@ -89,12 +89,174 @@ function normalizeTaxId(value: unknown): string {
   return String(value ?? "").replace(/\D/g, "");
 }
 
+function validateCpf(value: string): boolean {
+  if (!/^\d{11}$/.test(value) || /^(\d)\1+$/.test(value)) return false;
+
+  const digit = (length: number) => {
+    let sum = 0;
+    for (let index = 0; index < length; index += 1) {
+      sum += Number(value[index]) * (length + 1 - index);
+    }
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+
+  return digit(9) === Number(value[9]) && digit(10) === Number(value[10]);
+}
+
+function validateCnpj(value: string): boolean {
+  if (!/^\d{14}$/.test(value) || /^(\d)\1+$/.test(value)) return false;
+
+  const calculate = (length: 12 | 13) => {
+    const weights =
+      length === 12
+        ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const sum = value
+      .slice(0, length)
+      .split("")
+      .reduce((total, char, index) => total + Number(char) * weights[index], 0);
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  return (
+    calculate(12) === Number(value[12]) &&
+    calculate(13) === Number(value[13])
+  );
+}
+
+function validateTaxId(value: string): boolean {
+  return value.length === 11 ? validateCpf(value) : validateCnpj(value);
+}
+
+function normalizeMetadata(value: unknown): Record<string, unknown> {
+  if (value == null) return {};
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new BadRequestException("metadata must be a JSON object.");
+  }
+
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized, "utf8") > 16_384) {
+    throw new BadRequestException("metadata exceeds the 16 KB limit.");
+  }
+
+  return value as Record<string, unknown>;
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly routing: RoutingEngineService,
   ) {}
+
+  async getPayment(
+    merchant: MerchantApiContext,
+    paymentIntentId: string,
+  ) {
+    const result = await this.database.query<{
+      id: string;
+      external_reference: string | null;
+      amount: string;
+      currency: string;
+      status: string;
+      payment_method: string;
+      created_at: string;
+      updated_at: string;
+      completed_at: string | null;
+      store_code: string;
+      store_name: string;
+      provider_code: string | null;
+      gateway_alias: string | null;
+      provider_payment_id: string | null;
+      provider_attempt_status: string | null;
+      ambiguous: boolean | null;
+      response_metadata: Record<string, unknown> | null;
+      metadata: Record<string, unknown>;
+    }>(
+      `
+      select
+        pi.id,
+        pi.external_reference,
+        pi.amount::text,
+        pi.currency,
+        pi.status,
+        pi.payment_method,
+        pi.created_at::text,
+        pi.updated_at::text,
+        pi.completed_at::text,
+        s.code as store_code,
+        s.name as store_name,
+        p.code as provider_code,
+        gc.alias as gateway_alias,
+        pa.provider_payment_id,
+        pa.status as provider_attempt_status,
+        pa.ambiguous,
+        pa.response_metadata,
+        pi.metadata
+      from pixbrasil.payment_intents pi
+      join pixbrasil.stores s on s.id=pi.store_id
+      join pixbrasil.merchant_api_key_store_grants g
+        on g.store_id=s.id
+       and g.api_key_id=$1::uuid
+      left join lateral (
+        select pa0.*
+        from pixbrasil.provider_attempts pa0
+        where pa0.payment_intent_id=pi.id
+        order by pa0.attempt_no desc
+        limit 1
+      ) pa on true
+      left join pixbrasil.gateway_connections gc
+        on gc.id=coalesce(pa.gateway_connection_id,pi.selected_connection_id)
+      left join public.providers p on p.id=gc.provider_id
+      where pi.id=$2::uuid
+        and pi.merchant_id=$3::uuid
+      limit 1
+      `,
+      [merchant.apiKeyId, paymentIntentId, merchant.merchantId],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      throw new NotFoundException(
+        "PaymentIntent not found or not granted to this API key.",
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        paymentIntentId: row.id,
+        reference: row.external_reference,
+        amount: Number(row.amount),
+        currency: row.currency,
+        paymentMethod: row.payment_method,
+        status: row.status,
+        store: {
+          code: row.store_code,
+          name: row.store_name,
+        },
+        routing: {
+          providerCode: row.provider_code,
+          gatewayAlias: row.gateway_alias,
+          mode: row.metadata?.routingMode ?? null,
+          releaseClass: row.metadata?.releaseClass ?? null,
+        },
+        provider: row.provider_payment_id
+          ? {
+              paymentId: row.provider_payment_id,
+              attemptStatus: row.provider_attempt_status,
+              ambiguous: Boolean(row.ambiguous),
+            }
+          : null,
+        economics: row.metadata?.shadowQuote ?? null,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        completedAt: row.completed_at,
+      },
+    };
+  }
 
   async createShadowCharge(
     merchant: MerchantApiContext,
@@ -121,9 +283,14 @@ export class PaymentsService {
 
     const payerName = requiredString(input.payer?.name, "payer.name").slice(0, 100);
     const payerTaxId = normalizeTaxId(input.payer?.taxId);
-    if (!/^\d{11}$/.test(payerTaxId) && !/^\d{14}$/.test(payerTaxId)) {
-      throw new BadRequestException("payer.taxId must be a valid CPF/CNPJ format.");
+    if (
+      (!/^\d{11}$/.test(payerTaxId) && !/^\d{14}$/.test(payerTaxId)) ||
+      !validateTaxId(payerTaxId)
+    ) {
+      throw new BadRequestException("payer.taxId must be a valid CPF/CNPJ.");
     }
+
+    const merchantMetadata = normalizeMetadata(input.metadata);
 
     const configResult = await this.database.query<StoreConfigRow>(
       `
@@ -304,9 +471,12 @@ export class PaymentsService {
         Math.max(0, normalizedAmount - routeCostBrl - platformFeeBrl) * 100,
       ) / 100;
 
+    const taxIdHash = createHash("sha256").update(payerTaxId).digest("hex");
     const customerSnapshot = {
       name: payerName,
-      taxId: payerTaxId,
+      taxIdHash,
+      taxIdLast4: payerTaxId.slice(-4),
+      taxIdType: payerTaxId.length === 11 ? "CPF" : "CNPJ",
       ...(String(input.payer?.email ?? "").trim()
         ? { email: String(input.payer?.email).trim().slice(0, 255) }
         : {}),
@@ -339,10 +509,7 @@ export class PaymentsService {
         JSON.stringify({
           requestFingerprint,
           description: String(input.description ?? "").slice(0, 200),
-          merchantMetadata:
-            input.metadata && typeof input.metadata === "object"
-              ? input.metadata
-              : {},
+          merchantMetadata,
         }),
       ],
     );

@@ -72,6 +72,7 @@ export interface PixProviderAdapter {
     payload: unknown,
     headers: Record<string, string | string[] | undefined>,
     credentials: unknown,
+    rawBody?: Buffer,
   ): Promise<unknown>;
 
   mapProviderStatus(payload: unknown): NormalizedProviderStatus;

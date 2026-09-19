@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/config/site";
 
 const PUBLIC_ROUTES = [
-  "/","/personal","/business","/pricing","/how-it-works","/support","/early-access",
+  "/","/personal","/business","/pricing","/how-it-works","/support",
   "/legal/terms","/legal/privacy","/legal/cookies","/legal/risk-disclosure",
   "/legal/regulatory-status","/legal/aml-kyc","/legal/acceptable-use"
 ];

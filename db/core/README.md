@@ -20,7 +20,11 @@ this shared core, not as the owner of the database.
 - `20260918053600 pixbrasil_foundation_v1`
 - `20260918053604 pixbrasil_initial_providers`
 - `20260918231006 controlplane_admin_core_v1`
-- `controlplane_fk_indexes_v1` (applied immediately after V1; see migration history for generated timestamp)
+- `20260918231040 controlplane_fk_indexes_v1`
+- `20260919070831 pixbrasil_route_economics_release_v1`
+- `20260919071256 pixbrasil_merchant_api_keys_v1`
+- `20260919071907 pixbrasil_route_economics_indexes_v1`
+- `20260919145422 account_memberships_client_portal_v1`
 
 The Control Plane migration creates RBAC, approvals, provider credential
 references, webhook configuration, payout/manual-adjustment workflows,
@@ -33,3 +37,8 @@ and non-secret fingerprints are persisted.
 
 Initial feature flags deliberately keep enforced routing, manual payouts,
 manual ledger adjustments and automatic provider-webhook registration disabled.
+
+
+## Client Portal boundary
+
+`public.account_memberships` provides account-level access for Personal and Business users with roles `OWNER`, `ADMIN`, `FINANCE` and `VIEWER`. It does not grant browser access to financial tables. The client frontend authenticates through the API layer and all Core reads remain backend-mediated.

@@ -4,9 +4,10 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
+import type { NormalizedProviderStatus } from "../providers/provider-adapter";
 
 interface MisticWebhookPayload {
   transactionId?: string | number;
@@ -33,9 +34,184 @@ export class WebhooksService {
   ) {
     const transactionId = String(payload.transactionId ?? "").trim();
     if (!transactionId) {
-      throw new BadRequestException("MisticPay webhook is missing transactionId.");
+      throw new BadRequestException(
+        "MisticPay webhook is missing transactionId.",
+      );
     }
 
+    const connection = await this.loadConnection("misticpay-primary");
+    const credentials = this.parseCredentials(
+      connection.decrypted_secret!,
+      "MisticPay",
+    );
+    const adapter = this.providers.get("MISTICPAY");
+
+    let verifiedPayload: unknown;
+    let verifiedStatus: NormalizedProviderStatus;
+    try {
+      verifiedPayload = await adapter.verifyWebhook(
+        payload,
+        headers,
+        credentials,
+      );
+      verifiedStatus = adapter.mapProviderStatus(verifiedPayload);
+    } catch (error) {
+      throw new BadGatewayException(
+        error instanceof Error
+          ? "MisticPay webhook could not be verified S2S."
+          : "MisticPay webhook verification failed.",
+      );
+    }
+
+    const eventType =
+      String(payload.transactionType ?? "UNKNOWN").toUpperCase() +
+      ":" +
+      String(payload.status ?? verifiedStatus ?? "UNKNOWN").toUpperCase();
+    const eventKey = transactionId + ":" + eventType;
+
+    const redactedPayload = {
+      transactionId,
+      transactionType: payload.transactionType ?? null,
+      transactionMethod: payload.transactionMethod ?? null,
+      status: payload.status ?? null,
+      verifiedStatus,
+      value: payload.value ?? null,
+      fee: payload.fee ?? null,
+      e2e: payload.e2e ?? null,
+      ispb: payload.ispb ?? null,
+      bankName: payload.bankName ?? null,
+    };
+
+    const persisted = await this.persistVerifiedEvent({
+      connectionId: connection.connection_id,
+      eventKey,
+      eventType,
+      payload: redactedPayload,
+    });
+
+    await this.applyVerifiedPaymentStatus(
+      connection.connection_id,
+      transactionId,
+      verifiedStatus,
+      "MISTICPAY",
+    );
+
+    return {
+      success: true,
+      accepted: true,
+      replay: persisted.replay,
+      provider: "MISTICPAY",
+      transactionId,
+      verifiedStatus,
+    };
+  }
+
+  async handlePixGo(
+    payload: Record<string, unknown>,
+    headers: Record<string, string | string[] | undefined>,
+    rawBody?: Buffer,
+  ) {
+    const root = payload;
+    const nested =
+      root.data && typeof root.data === "object" && !Array.isArray(root.data)
+        ? (root.data as Record<string, unknown>)
+        : {};
+
+    const paymentId = String(
+      nested.payment_id ?? root.payment_id ?? root.paymentId ?? "",
+    ).trim();
+    const eventName = String(
+      root.event ??
+        this.headerValue(headers, "x-webhook-event") ??
+        "UNKNOWN",
+    )
+      .trim()
+      .toLowerCase();
+
+    if (!paymentId) {
+      throw new BadRequestException("PixGo webhook is missing payment_id.");
+    }
+
+    const connection = await this.loadConnection("pixgo-primary");
+    const credentials = this.parseCredentials(
+      connection.decrypted_secret!,
+      "PixGo",
+    );
+    const adapter = this.providers.get("PIXGO");
+
+    let verifiedPayload: unknown;
+    let verifiedStatus: NormalizedProviderStatus;
+    try {
+      verifiedPayload = await adapter.verifyWebhook(
+        payload,
+        headers,
+        credentials,
+        rawBody,
+      );
+      verifiedStatus = adapter.mapProviderStatus(verifiedPayload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (
+        message.startsWith("PIXGO_WEBHOOK_") ||
+        message.includes("payment_id")
+      ) {
+        throw new BadRequestException("PixGo webhook signature is invalid.");
+      }
+      throw new BadGatewayException(
+        "PixGo webhook could not be confirmed S2S.",
+      );
+    }
+
+    const eventType = eventName || "unknown";
+    const eventKey = paymentId + ":" + eventType;
+
+    const amounts =
+      nested.amounts &&
+      typeof nested.amounts === "object" &&
+      !Array.isArray(nested.amounts)
+        ? (nested.amounts as Record<string, unknown>)
+        : {};
+
+    const redactedPayload = {
+      paymentId,
+      externalId: String(
+        nested.external_id ?? root.external_id ?? "",
+      ).slice(0, 200) || null,
+      event: eventType,
+      verifiedStatus,
+      gross: amounts.gross ?? nested.amount ?? root.amount ?? null,
+      net: amounts.net ?? null,
+      completedAt: nested.completed_at ?? root.completed_at ?? null,
+      expiredAt: nested.expired_at ?? root.expired_at ?? null,
+      refundedAt: nested.refunded_at ?? root.refunded_at ?? null,
+    };
+
+    const persisted = await this.persistVerifiedEvent({
+      connectionId: connection.connection_id,
+      eventKey,
+      eventType,
+      payload: redactedPayload,
+    });
+
+    await this.applyVerifiedPaymentStatus(
+      connection.connection_id,
+      paymentId,
+      verifiedStatus,
+      "PIXGO",
+    );
+
+    return {
+      success: true,
+      accepted: true,
+      replay: persisted.replay,
+      provider: "PIXGO",
+      paymentId,
+      event: eventType,
+      verifiedStatus,
+    };
+  }
+
+  private async loadConnection(alias: string) {
     const connection = await this.database.query<{
       connection_id: string;
       decrypted_secret: string | null;
@@ -46,138 +222,139 @@ export class WebhooksService {
         v.decrypted_secret
       from pixbrasil.gateway_connections gc
       left join vault.decrypted_secrets v on v.id=gc.vault_secret_id
-      where gc.alias='misticpay-primary'
+      where gc.alias=$1::varchar
       limit 1
       `,
+      [alias],
     );
 
     const row = connection.rows[0];
     if (!row?.decrypted_secret) {
       throw new ServiceUnavailableException(
-        "MisticPay credentials are not available for S2S verification.",
+        "Provider credentials are not available for webhook verification.",
       );
     }
 
-    const payloadHash = createHash("sha256")
-      .update(JSON.stringify(payload))
-      .digest("hex");
+    return row;
+  }
 
-    const eventId = randomUUID();
-    const eventType =
-      String(payload.transactionType ?? "UNKNOWN").toUpperCase() +
-      ":" +
-      String(payload.status ?? "UNKNOWN").toUpperCase();
-
-    const redactedPayload = {
-      transactionId,
-      transactionType: payload.transactionType ?? null,
-      transactionMethod: payload.transactionMethod ?? null,
-      status: payload.status ?? null,
-      value: payload.value ?? null,
-      fee: payload.fee ?? null,
-      e2e: payload.e2e ?? null,
-      ispb: payload.ispb ?? null,
-      bankName: payload.bankName ?? null,
-    };
-
-    await this.database.query(
-      `
-      insert into public.webhook_events(
-        id,
-        provider_code,
-        external_event_id,
-        event_type,
-        status,
-        payload_hash,
-        payload,
-        attempt_count,
-        received_at,
-        updated_at
-      )
-      values(
-        $1::uuid,
-        'MISTICPAY',
-        $2::varchar,
-        $3::varchar,
-        'RECEIVED',
-        $4::varchar,
-        $5::jsonb,
-        1,
-        now(),
-        now()
-      )
-      `,
-      [
-        eventId,
-        transactionId,
-        eventType,
-        payloadHash,
-        JSON.stringify(redactedPayload),
-      ],
-    );
-
-    let credentials: unknown;
+  private parseCredentials(value: string, provider: string): unknown {
     try {
-      credentials = JSON.parse(row.decrypted_secret);
+      return JSON.parse(value);
     } catch {
-      await this.markFailed(eventId, "INVALID_VAULT_CREDENTIAL_JSON");
       throw new ServiceUnavailableException(
-        "MisticPay Vault credential is malformed.",
-      );
-    }
-
-    try {
-      const adapter = this.providers.get("MISTICPAY");
-      const verifiedPayload = await adapter.verifyWebhook(
-        payload,
-        headers,
-        credentials,
-      );
-      const verifiedStatus = adapter.mapProviderStatus(verifiedPayload);
-
-      await this.database.query(
-        `
-        update public.webhook_events
-        set status='PROCESSED',
-            payload=payload || jsonb_build_object(
-              'verifiedS2S', true,
-              'verifiedStatus', $2::text,
-              'connectionId', $3::text
-            ),
-            processed_at=now(),
-            updated_at=now()
-        where id=$1::uuid
-        `,
-        [eventId, verifiedStatus, row.connection_id],
-      );
-
-      return {
-        success: true,
-        accepted: true,
-        provider: "MISTICPAY",
-        transactionId,
-        verifiedStatus,
-      };
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "MISTICPAY_S2S_VERIFY_FAILED";
-      await this.markFailed(eventId, message);
-      throw new BadGatewayException(
-        "MisticPay webhook could not be verified S2S.",
+        provider + " Vault credential is malformed.",
       );
     }
   }
 
-  private async markFailed(eventId: string, message: string) {
+  private async persistVerifiedEvent(input: {
+    connectionId: string;
+    eventKey: string;
+    eventType: string;
+    payload: Record<string, unknown>;
+  }) {
+    const serialized = JSON.stringify(input.payload);
+    const payloadHash = createHash("sha256")
+      .update(serialized)
+      .digest("hex");
+
+    const inserted = await this.database.query<{ id: string }>(
+      `
+      insert into pixbrasil.provider_webhook_events(
+        gateway_connection_id,
+        provider_event_key,
+        event_type,
+        status,
+        payload_hash,
+        payload,
+        received_at,
+        processed_at
+      )
+      values(
+        $1::uuid,$2::text,$3::text,'PROCESSED',
+        $4::text,$5::jsonb,now(),now()
+      )
+      on conflict (gateway_connection_id,provider_event_key)
+      do nothing
+      returning id
+      `,
+      [
+        input.connectionId,
+        input.eventKey,
+        input.eventType,
+        payloadHash,
+        serialized,
+      ],
+    );
+
+    return { replay: !inserted.rows[0] };
+  }
+
+  private async applyVerifiedPaymentStatus(
+    connectionId: string,
+    providerPaymentId: string,
+    status: NormalizedProviderStatus,
+    providerCode: string,
+  ) {
+    const paymentStatus =
+      status === "SUCCEEDED"
+        ? "SUCCEEDED"
+        : status === "FAILED"
+          ? "FAILED"
+          : status === "CANCELED" || status === "REFUNDED"
+            ? "CANCELED"
+            : status === "PENDING"
+              ? "PENDING_PAYMENT"
+              : null;
+
+    if (!paymentStatus) return;
+
     await this.database.query(
       `
-      update public.webhook_events
-      set status='FAILED',
-          error=$2::text,
+      with matched_attempt as (
+        select pa.id,pa.payment_intent_id
+        from pixbrasil.provider_attempts pa
+        where pa.gateway_connection_id=$1::uuid
+          and pa.provider_payment_id=$2::text
+        order by pa.attempt_no desc
+        limit 1
+      ),
+      updated_attempt as (
+        update pixbrasil.provider_attempts pa
+        set response_metadata=coalesce(pa.response_metadata,'{}'::jsonb) ||
+              jsonb_build_object(
+                'lastWebhookStatus',$3::text,
+                'lastWebhookProvider',$4::text,
+                'lastWebhookAt',now()
+              )
+        where pa.id=(select id from matched_attempt)
+        returning pa.id
+      )
+      update pixbrasil.payment_intents pi
+      set status=$5::text,
+          completed_at=case
+            when $5::text='SUCCEEDED' then coalesce(pi.completed_at,now())
+            else pi.completed_at
+          end,
+          metadata=coalesce(pi.metadata,'{}'::jsonb) ||
+            jsonb_build_object(
+              'lastVerifiedProviderStatus',$3::text,
+              'lastVerifiedProvider',$4::text,
+              'lastWebhookAt',now()
+            ),
           updated_at=now()
-      where id=$1::uuid
+      where pi.id=(select payment_intent_id from matched_attempt)
       `,
-      [eventId, message.slice(0, 2000)],
+      [connectionId, providerPaymentId, status, providerCode, paymentStatus],
     );
+  }
+
+  private headerValue(
+    headers: Record<string, string | string[] | undefined>,
+    name: string,
+  ) {
+    const value = headers[name] ?? headers[name.toLowerCase()];
+    return Array.isArray(value) ? String(value[0] ?? "") : String(value ?? "");
   }
 }

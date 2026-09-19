@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AdminModule } from "./modules/admin/admin.module";
+import { ClientModule } from "./modules/client/client.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { HealthModule } from "./modules/health/health.module";
 import { ProvidersModule } from "./modules/providers/providers.module";
@@ -12,6 +13,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
     HealthModule,
     AuthModule,
     AdminModule,
+    ClientModule,
     ProvidersModule,
     PaymentsModule,
     RoutingModule,

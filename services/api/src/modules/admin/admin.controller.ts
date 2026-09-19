@@ -109,6 +109,66 @@ export class AdminController {
     );
   }
 
+  @Get("onboarding")
+  @RequirePermissions("onboarding.read")
+  onboarding() {
+    return this.admin.onboardingOverview();
+  }
+
+  @Get("stores")
+  @RequirePermissions("merchants.read")
+  stores() {
+    return this.admin.storesOverview();
+  }
+
+  @Get("transactions")
+  @RequirePermissions("transactions.read")
+  transactions() {
+    return this.admin.transactionsOverview();
+  }
+
+  @Get("ledger")
+  @RequirePermissions("ledger.read")
+  ledger() {
+    return this.admin.ledgerOverview();
+  }
+
+  @Get("settlements")
+  @RequirePermissions("settlements.read")
+  settlements() {
+    return this.admin.settlementsOverview();
+  }
+
+  @Get("payouts")
+  @RequirePermissions("payouts.read")
+  payouts() {
+    return this.admin.payoutsOverview();
+  }
+
+  @Get("users")
+  @RequirePermissions("users.read")
+  users() {
+    return this.admin.usersOverview();
+  }
+
+  @Get("audit")
+  @RequirePermissions("audit.read")
+  audit() {
+    return this.admin.auditOverview();
+  }
+
+  @Get("system")
+  @RequirePermissions("system.read")
+  system() {
+    return this.admin.systemOverview();
+  }
+
+  @Get("risk")
+  @RequirePermissions("risk.read")
+  risk() {
+    return this.admin.riskOverview();
+  }
+
   @Get("routing/overview")
   @RequirePermissions("routing.read")
   routingOverview() {
