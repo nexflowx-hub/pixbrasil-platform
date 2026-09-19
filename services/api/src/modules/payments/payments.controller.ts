@@ -2,7 +2,9 @@ import {
   Body,
   Controller,
   Headers,
+  Get,
   HttpCode,
+  Param,
   Post,
   Req,
   UseGuards,
@@ -15,6 +17,17 @@ import { PaymentsService } from "./payments.service";
 @UseGuards(MerchantApiKeyGuard)
 export class PaymentsController {
   constructor(private readonly payments: PaymentsService) {}
+
+  @Get(":paymentIntentId")
+  getPayment(
+    @Req() request: MerchantApiRequest,
+    @Param("paymentIntentId") paymentIntentId: string,
+  ) {
+    return this.payments.getPayment(
+      request.merchantContext!,
+      paymentIntentId,
+    );
+  }
 
   @Post("charge")
   @HttpCode(200)
