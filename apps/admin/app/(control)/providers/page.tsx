@@ -1,7 +1,7 @@
-import { DataPage } from "@/components/data-page";
+import { ProviderControlPlane } from "@/components/provider-control-plane";
 
 export const metadata = { title: "Provider Library" };
 
 export default function ProvidersPage() {
-  return <DataPage kind="providers" />;
+  return <ProviderControlPlane mode="library" />;
 }
