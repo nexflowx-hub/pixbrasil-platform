@@ -41,7 +41,7 @@ export class WebhooksService {
 
     const connection = await this.loadConnection("misticpay-primary");
     const credentials = this.parseCredentials(
-      connection.decrypted_secret,
+      connection.decrypted_secret!,
       "MisticPay",
     );
     const adapter = this.providers.get("MISTICPAY");
@@ -134,7 +134,7 @@ export class WebhooksService {
 
     const connection = await this.loadConnection("pixgo-primary");
     const credentials = this.parseCredentials(
-      connection.decrypted_secret,
+      connection.decrypted_secret!,
       "PixGo",
     );
     const adapter = this.providers.get("PIXGO");
