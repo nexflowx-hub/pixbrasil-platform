@@ -300,28 +300,36 @@ export class AdminService {
 
     await this.database.query(
       `
-      update pixbrasil.gateway_connections
-      set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
-            'credentialState',$2::text,
-            'lifecycleState',$3::text,
-            'routingEligible',false,
-            'lastConnectionTestAt',now(),
-            'lastConnectionHealth',$4::text,
-            'lastConnectionLatencyMs',$5::int,
-            'lastConnectionDetail',$6::text
-          ),
-          status='DISABLED',
-          updated_at=now()
-      where id=$1::uuid;
-
-      update public.provider_accounts
-      set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
-            'credentialState',$2::text,
-            'lifecycleState',$3::text,
-            'lastConnectionTestAt',now()
-          ),
-          updated_at=now()
-      where id=$7::uuid
+      with updated_connection as (
+        update pixbrasil.gateway_connections
+        set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'credentialState',$2::text,
+              'lifecycleState',$3::text,
+              'routingEligible',false,
+              'lastConnectionTestAt',now(),
+              'lastConnectionHealth',$4::text,
+              'lastConnectionLatencyMs',$5::int,
+              'lastConnectionDetail',$6::text
+            ),
+            status='DISABLED',
+            updated_at=now()
+        where id=$1::uuid
+        returning id
+      ),
+      updated_account as (
+        update public.provider_accounts
+        set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'credentialState',$2::text,
+              'lifecycleState',$3::text,
+              'lastConnectionTestAt',now()
+            ),
+            updated_at=now()
+        where id=$7::uuid
+        returning id
+      )
+      select
+        (select count(*) from updated_connection)::int as connections_updated,
+        (select count(*) from updated_account)::int as accounts_updated
       `,
       [
         connection.connection_id,
@@ -396,37 +404,51 @@ export class AdminService {
 
     await this.database.query(
       `
-      update pixbrasil.gateway_connections
-      set status='ACTIVE',
-          metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
-            'activationMode','SHADOW',
-            'lifecycleState','SHADOW',
-            'routingEligible',true,
-            'shadowActivatedAt',now()
-          ),
-          updated_at=now()
-      where id=$1::uuid;
-
-      update public.provider_accounts
-      set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
-            'lifecycleState','SHADOW'
-          ),
-          updated_at=now()
-      where id=$2::uuid;
-
-      update public.providers
-      set status='ACTIVE',
-          updated_at=now()
-      where id=$3::uuid;
-
-      update pixbrasil.routing_routes rr
-      set enabled=true,
-          updated_at=now()
-      from pixbrasil.routing_policies rp
-      where rr.policy_id=rp.id
-        and rr.gateway_connection_id=$1::uuid
-        and rp.activation_mode='SHADOW'
-        and rp.status='ACTIVE'
+      with updated_connection as (
+        update pixbrasil.gateway_connections
+        set status='ACTIVE',
+            metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'activationMode','SHADOW',
+              'lifecycleState','SHADOW',
+              'routingEligible',true,
+              'shadowActivatedAt',now()
+            ),
+            updated_at=now()
+        where id=$1::uuid
+        returning id
+      ),
+      updated_account as (
+        update public.provider_accounts
+        set metadata=coalesce(metadata,'{}'::jsonb) || jsonb_build_object(
+              'lifecycleState','SHADOW'
+            ),
+            updated_at=now()
+        where id=$2::uuid
+        returning id
+      ),
+      updated_provider as (
+        update public.providers
+        set status='ACTIVE',
+            updated_at=now()
+        where id=$3::uuid
+        returning id
+      ),
+      updated_routes as (
+        update pixbrasil.routing_routes rr
+        set enabled=true,
+            updated_at=now()
+        from pixbrasil.routing_policies rp
+        where rr.policy_id=rp.id
+          and rr.gateway_connection_id=$1::uuid
+          and rp.activation_mode='SHADOW'
+          and rp.status='ACTIVE'
+        returning rr.id
+      )
+      select
+        (select count(*) from updated_connection)::int as connections_updated,
+        (select count(*) from updated_account)::int as accounts_updated,
+        (select count(*) from updated_provider)::int as providers_updated,
+        (select count(*) from updated_routes)::int as routes_updated
       `,
       [
         row.connection_id,
