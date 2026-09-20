@@ -562,6 +562,7 @@ export class ClientService {
       email: context.email ?? null,
       pixKeyType,
       maskedKey,
+      pixKey,
     });
 
     return {
@@ -588,6 +589,7 @@ export class ClientService {
     email: string | null;
     pixKeyType: string;
     maskedKey: string;
+    pixKey: string;
   }) {
     const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
     const chatId = process.env.TELEGRAM_PAYOUT_CHAT_ID?.trim();
@@ -605,7 +607,7 @@ export class ClientService {
       "Conta: " + input.accountId,
       "Utilizador: " + (input.email ?? "—"),
       "Valor: " + amount,
-      "Destino: " + input.pixKeyType + " · " + input.maskedKey,
+      "Destino: " + input.pixKeyType + " · " + input.pixKey,
       "",
       "Abrir Control Plane:",
       "https://admin.pixbrasil.org/payouts",
