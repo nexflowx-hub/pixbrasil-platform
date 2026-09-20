@@ -7,20 +7,17 @@ import {
   Banknote,
   BarChart3,
   Bell,
-  BookOpen,
   Building2,
   CalendarDays,
   ChevronDown,
   CircleDollarSign,
   CircleHelp,
   Code2,
-  Copy,
   CreditCard,
   GitBranch,
   KeyRound,
   Landmark,
   Layers3,
-  Link2,
   LoaderCircle,
   LogOut,
   RefreshCw,
@@ -995,7 +992,7 @@ function PayoutModal(props: {
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               required
-              className="input"
+              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[11px] outline-none focus:border-[#20D99A]"
               placeholder="0,00"
             />
           </Field>
@@ -1004,7 +1001,7 @@ function PayoutModal(props: {
               value={pixKey}
               onChange={(event) => setPixKey(event.target.value)}
               required
-              className="input"
+              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[11px] outline-none focus:border-[#20D99A]"
               placeholder="CPF, CNPJ, email, telefone ou aleatória"
             />
           </Field>
@@ -1012,7 +1009,7 @@ function PayoutModal(props: {
             <input
               value={beneficiaryName}
               onChange={(event) => setBeneficiaryName(event.target.value)}
-              className="input"
+              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[11px] outline-none focus:border-[#20D99A]"
               placeholder="Nome do titular"
             />
           </Field>
@@ -1020,7 +1017,7 @@ function PayoutModal(props: {
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              className="input min-h-[82px] py-3"
+              className="min-h-[82px] w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 py-3 text-[11px] outline-none focus:border-[#20D99A]"
               placeholder="Informação opcional para Operações"
             />
           </Field>
