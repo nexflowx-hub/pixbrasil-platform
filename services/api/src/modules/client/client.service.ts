@@ -523,72 +523,88 @@ export class ClientService {
         ? (input.destination as Record<string, unknown>)
         : {};
 
-    const wallet = await this.database.query<{
-      wallet_id: string;
-      asset_id: string;
-      available: string;
-    }>(
-      `
-      select
-        w.id as wallet_id,
-        ass.id as asset_id,
-        coalesce(wb.available,0)::text as available
-      from public.wallets w
-      join public.assets ass on ass.id=w.asset_id
-      left join public.wallet_balances wb on wb.wallet_id=w.id
-      where w.account_id=$1::uuid
-        and ass.code='BRL'
-        and w.status='ACTIVE'
-      limit 1
-      `,
-      [accountId],
-    );
+    const ticket = await this.database.withTransaction(async (client) => {
+      const wallet = await client.query<{
+        wallet_id: string;
+        asset_id: string;
+        available: string;
+      }>(
+        `
+        select
+          w.id as wallet_id,
+          ass.id as asset_id,
+          coalesce(wb.available,0)::text as available
+        from public.wallets w
+        join public.assets ass on ass.id=w.asset_id
+        join public.wallet_balances wb on wb.wallet_id=w.id
+        where w.account_id=$1::uuid
+          and ass.code='BRL'
+          and w.status='ACTIVE'
+        limit 1
+        for update of wb
+        `,
+        [accountId],
+      );
 
-    const walletRow = wallet.rows[0];
-    if (!walletRow) {
-      throw new BadRequestException("BRL wallet is not available.");
-    }
-    if (Number(walletRow.available) < amount) {
-      throw new BadRequestException("Insufficient available BRL balance.");
-    }
+      const walletRow = wallet.rows[0];
+      if (!walletRow) {
+        throw new BadRequestException("BRL wallet is not available.");
+      }
+      if (Number(walletRow.available) < amount) {
+        throw new BadRequestException("Insufficient available BRL balance.");
+      }
 
-    const result = await this.database.query<{
-      id: string;
-      external_reference: string;
-      status: string;
-      created_at: string;
-    }>(
-      `
-      insert into controlplane.payout_requests(
-        account_id,wallet_id,asset_id,amount,destination_type,
-        destination_snapshot,status,external_reference,
-        proof_metadata,requested_by,created_at,updated_at
-      )
-      values(
-        $1::uuid,$2::uuid,$3::uuid,$4::numeric,$5::varchar,
-        $6::jsonb,'DRAFT',
-        ('PAYOUT-' || to_char(now(),'YYYYMMDD') || '-' ||
-          upper(substr(replace(gen_random_uuid()::text,'-',''),1,8))),
-        jsonb_build_object(
-          'channel','TELEGRAM_MANUAL_TICKET',
-          'automation','PENDING'
-        ),
-        $7::uuid,now(),now()
-      )
-      returning id,external_reference,status,created_at::text
-      `,
-      [
-        accountId,
-        walletRow.wallet_id,
-        walletRow.asset_id,
-        amount,
-        destinationType,
-        JSON.stringify(destination),
-        context.authUserId,
-      ],
-    );
+      const result = await client.query<{
+        id: string;
+        external_reference: string;
+        status: string;
+        created_at: string;
+      }>(
+        `
+        insert into controlplane.payout_requests(
+          account_id,wallet_id,asset_id,amount,destination_type,
+          destination_snapshot,status,external_reference,
+          proof_metadata,requested_by,created_at,updated_at
+        )
+        values(
+          $1::uuid,$2::uuid,$3::uuid,$4::numeric,$5::varchar,
+          $6::jsonb,'DRAFT',
+          ('PAYOUT-' || to_char(now(),'YYYYMMDD') || '-' ||
+            upper(substr(replace(gen_random_uuid()::text,'-',''),1,8))),
+          jsonb_build_object(
+            'channel','TELEGRAM_MANUAL_TICKET',
+            'automation','PENDING'
+          ),
+          $7::uuid,now(),now()
+        )
+        returning id,external_reference,status,created_at::text
+        `,
+        [
+          accountId,
+          walletRow.wallet_id,
+          walletRow.asset_id,
+          amount,
+          destinationType,
+          JSON.stringify(destination),
+          context.authUserId,
+        ],
+      );
 
-    const ticket = result.rows[0];
+      await client.query(
+        `
+        update public.wallet_balances
+        set
+          available=available-$2::numeric,
+          reserved=reserved+$2::numeric,
+          updated_at=now()
+        where wallet_id=$1::uuid
+        `,
+        [walletRow.wallet_id, amount],
+      );
+
+      return result.rows[0];
+    });
+
     const message = [
       "PiXBrasil payout ticket",
       `Reference: ${ticket.external_reference}`,
