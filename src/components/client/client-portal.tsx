@@ -2,12 +2,8 @@
 
 import {
   Activity,
-  ArrowDownToLine,
-  ArrowRight,
-  ArrowUpFromLine,
   Building2,
   CircleDollarSign,
-  GitBranch,
   KeyRound,
   Layers3,
   LoaderCircle,
@@ -402,15 +398,6 @@ function TransactionList({ transactions }: { transactions: OverviewPayload["data
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/6 bg-white/[.015] p-3">
-      <span className="block uppercase tracking-[.1em] text-[#58716A]">{label}</span>
-      <strong className="mt-1 block truncate text-[#9FB4AE]">{value}</strong>
     </div>
   );
 }
