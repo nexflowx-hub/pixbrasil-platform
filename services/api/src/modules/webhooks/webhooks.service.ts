@@ -219,6 +219,13 @@ export class WebhooksService {
     );
 
     if (payment && !persisted.replay) {
+      if (payment.status === "SUCCEEDED") {
+        const settlement = await this.settlements.postVerifiedPayment(
+          payment.paymentIntentId,
+        );
+        payment.settlement = settlement;
+      }
+
       await this.merchantWebhooks.deliverPaymentEvent(
         this.toMerchantEventType(payment.status),
         payment,
