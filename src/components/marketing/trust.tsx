@@ -37,7 +37,7 @@ export function Trust() {
           <p className="text-[10.5px] font-bold uppercase tracking-[0.28em] text-pix">Confiança</p>
           <h2 className="mt-1 text-[19px] font-extrabold tracking-[-0.02em] text-cream">EM CADA OPERAÇÃO</h2>
           <p className="mt-1.5 text-[11.5px] leading-[1.55] text-mist">
-            Guardrails técnicos, estados explícitos e ativação progressiva de cada capacidade financeira.
+            Autenticação forte, ledger rastreável, estados explícitos e verificação S2S em cada operação financeira.
           </p>
         </div>
 
