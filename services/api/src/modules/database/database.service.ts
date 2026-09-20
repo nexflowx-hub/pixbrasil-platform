@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy } from "@nestjs/common";
-import { Pool, type QueryResult, type QueryResultRow } from "pg";
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from "pg";
 
 export type RuntimeDependencyStatus = "ONLINE" | "OFFLINE" | "NOT_CONFIGURED";
 
@@ -37,6 +37,25 @@ export class DatabaseService implements OnModuleDestroy {
   ): Promise<QueryResult<T>> {
     if (!this.pool) throw new Error("DATABASE_URL is not configured.");
     return this.pool.query<T>(text, values);
+  }
+
+  async withTransaction<T>(
+    work: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    if (!this.pool) throw new Error("DATABASE_URL is not configured.");
+
+    const client = await this.pool.connect();
+    try {
+      await client.query("begin");
+      const result = await work(client);
+      await client.query("commit");
+      return result;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async health(): Promise<RuntimeDependencyHealth> {
