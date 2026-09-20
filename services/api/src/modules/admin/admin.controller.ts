@@ -139,6 +139,18 @@ export class AdminController {
     return this.admin.settlementsOverview();
   }
 
+  @Post("settlements/:settlementId/release")
+  @RequirePermissions("settlements.release")
+  releaseSettlement(
+    @Param("settlementId") settlementId: string,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.releaseSettlement(
+      settlementId,
+      request.adminContext!,
+    );
+  }
+
   @Get("payouts")
   @RequirePermissions("payouts.read")
   payouts() {
