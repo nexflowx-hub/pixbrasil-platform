@@ -1,6 +1,6 @@
 {
   "name": "@pixbrasil/api",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
@@ -9,7 +9,9 @@
     "start": "node dist/main.js",
     "test": "npm run build && node --test \"dist/modules/auth/*.spec.js\" \"dist/modules/routing/*.spec.js\" \"dist/modules/providers/*.spec.js\" \"dist/modules/payments/*.spec.js\" \"dist/modules/webhooks/*.spec.js\""
   },
-  "engines": { "node": ">=22 <25" },
+  "engines": {
+    "node": ">=22 <25"
+  },
   "dependencies": {
     "@nestjs/common": "12.0.3",
     "@nestjs/core": "12.0.3",
