@@ -101,16 +101,19 @@ export class WebhooksService {
     );
 
     if (payment && !persisted.replay) {
-      if (payment.status === "SUCCEEDED") {
-        const settlement = await this.settlements.postVerifiedPayment(
-          payment.paymentIntentId,
-        );
-        payment.settlement = settlement;
-      }
+      const merchantPayment =
+        payment.status === "SUCCEEDED"
+          ? {
+              ...payment,
+              settlement: await this.settlements.postVerifiedPayment(
+                payment.paymentIntentId,
+              ),
+            }
+          : payment;
 
       await this.merchantWebhooks.deliverPaymentEvent(
         this.toMerchantEventType(payment.status),
-        payment,
+        merchantPayment,
       );
     }
 
@@ -219,16 +222,19 @@ export class WebhooksService {
     );
 
     if (payment && !persisted.replay) {
-      if (payment.status === "SUCCEEDED") {
-        const settlement = await this.settlements.postVerifiedPayment(
-          payment.paymentIntentId,
-        );
-        payment.settlement = settlement;
-      }
+      const merchantPayment =
+        payment.status === "SUCCEEDED"
+          ? {
+              ...payment,
+              settlement: await this.settlements.postVerifiedPayment(
+                payment.paymentIntentId,
+              ),
+            }
+          : payment;
 
       await this.merchantWebhooks.deliverPaymentEvent(
         this.toMerchantEventType(payment.status),
-        payment,
+        merchantPayment,
       );
     }
 
