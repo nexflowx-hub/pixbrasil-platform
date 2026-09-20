@@ -254,7 +254,11 @@ export class PaymentsService {
               ambiguous: Boolean(row.ambiguous),
             }
           : null,
-        economics: row.metadata?.shadowQuote ?? null,
+        action: row.metadata?.providerAction ?? null,
+        economics:
+          row.metadata?.productionQuote ??
+          row.metadata?.shadowQuote ??
+          null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         completedAt: row.completed_at,
@@ -751,7 +755,7 @@ export class PaymentsService {
           name: config.store_name,
         },
         routing: {
-          mode: "SHADOW",
+          mode: row.metadata?.routingMode ?? "SHADOW",
           policy: config.policy_name,
           policyVersion: config.policy_version,
           providerCode: selectedRow.provider_code,
@@ -785,6 +789,8 @@ export class PaymentsService {
       provider_code: string | null;
       gateway_alias: string | null;
       outcome: string | null;
+      provider_payment_id: string | null;
+      provider_attempt_status: string | null;
     }>(
       `
       select
@@ -799,7 +805,9 @@ export class PaymentsService {
         rp.name as policy_name,
         p.code as provider_code,
         gc.alias as gateway_alias,
-        rd.outcome
+        rd.outcome,
+        pa.provider_payment_id,
+        pa.status as provider_attempt_status
       from pixbrasil.payment_intents pi
       left join pixbrasil.stores s on s.id=pi.store_id
       left join lateral (
@@ -809,8 +817,16 @@ export class PaymentsService {
         order by rd0.created_at desc
         limit 1
       ) rd on true
+      left join lateral (
+        select *
+        from pixbrasil.provider_attempts pa0
+        where pa0.payment_intent_id=pi.id
+        order by pa0.attempt_no desc
+        limit 1
+      ) pa on true
       left join pixbrasil.routing_policies rp on rp.id=rd.policy_id
-      left join pixbrasil.gateway_connections gc on gc.id=rd.selected_connection_id
+      left join pixbrasil.gateway_connections gc
+        on gc.id=coalesce(pa.gateway_connection_id,rd.selected_connection_id)
       left join public.providers p on p.id=gc.provider_id
       where pi.id=$1::uuid
       `,
@@ -825,7 +841,10 @@ export class PaymentsService {
       data: {
         paymentIntentId: row.id,
         idempotentReplay,
-        status: row.outcome ?? row.status,
+        status:
+          row.status === "CREATED" && row.outcome === "SHADOW_ONLY"
+            ? "SHADOW_ONLY"
+            : row.status,
         amount: Number(row.amount),
         currency: row.currency,
         reference: row.external_reference,
@@ -840,7 +859,17 @@ export class PaymentsService {
           gatewayAlias: row.gateway_alias,
           releaseClass: row.metadata?.releaseClass ?? null,
         },
-        economics: row.metadata?.shadowQuote ?? null,
+        provider: row.provider_payment_id
+          ? {
+              paymentId: row.provider_payment_id,
+              attemptStatus: row.provider_attempt_status,
+            }
+          : null,
+        action: row.metadata?.providerAction ?? null,
+        economics:
+          row.metadata?.productionQuote ??
+          row.metadata?.shadowQuote ??
+          null,
       },
     };
   }
