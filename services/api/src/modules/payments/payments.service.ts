@@ -305,7 +305,7 @@ export class PaymentsService {
     };
   }
 
-  async createShadowCharge(
+  async createCharge(
     merchant: MerchantApiContext,
     idempotencyKeyValue: string | undefined,
     input: ChargeInput,
@@ -433,7 +433,7 @@ export class PaymentsService {
           "Idempotency-Key was already used with a different payment payload.",
         );
       }
-      return this.loadShadowResult(existing.rows[0].id, true);
+      return this.loadCurrentResult(merchant, existing.rows[0].id, true);
     }
 
     const routeCostRule = await this.database.query<FeeRuleRow>(
@@ -573,7 +573,7 @@ export class PaymentsService {
       if (!duplicate.rows[0]) {
         throw new ConflictException("Unable to resolve idempotent payment.");
       }
-      return this.loadShadowResult(duplicate.rows[0].id, true);
+      return this.loadCurrentResult(merchant, duplicate.rows[0].id, true);
     }
 
     const paymentIntentId = inserted.rows[0].id;
@@ -650,7 +650,18 @@ export class PaymentsService {
           (row) => row.connection_id === selected.connectionId,
         )
       : undefined;
-    const outcome = selected ? "SHADOW_ONLY" : "NO_ROUTE";
+    const liveExecution = selected
+      ? await this.liveExecutionEnabled(
+          merchant.merchantId,
+          config.store_code,
+          config.activation_mode,
+        )
+      : false;
+    const outcome = selected
+      ? liveExecution
+        ? "SELECTED"
+        : "SHADOW_ONLY"
+      : "NO_ROUTE";
 
     const decision = await this.database.query<{ id: string }>(
       `
@@ -682,7 +693,7 @@ export class PaymentsService {
         ),
         JSON.stringify(draft.rejected),
         JSON.stringify({
-          mode: "SHADOW",
+          mode: liveExecution ? "LIVE" : "SHADOW",
           routeCostProfile: config.route_cost_profile_code,
           releaseProfile: config.release_profile_code,
           releaseClass: config.release_class,
