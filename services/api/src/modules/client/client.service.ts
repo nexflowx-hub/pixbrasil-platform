@@ -1,14 +1,20 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { randomUUID } from "node:crypto";
 import type { ClientContext } from "../client-auth/client-auth.types";
 import { DatabaseService } from "../database/database.service";
+import { FinancialCoreService } from "../financial/financial-core.service";
 
 @Injectable()
 export class ClientService {
-  constructor(private readonly database: DatabaseService) {}
+  constructor(
+    private readonly database: DatabaseService,
+    private readonly financial: FinancialCoreService,
+  ) {}
 
   async session(context: ClientContext) {
     const accounts = await Promise.all(
@@ -56,6 +62,158 @@ export class ClientService {
         accounts,
       },
     };
+  }
+
+  async createPayoutTicket(
+    context: ClientContext,
+    accountId: string,
+    input: Record<string, unknown>,
+  ) {
+    const access = context.accounts.find(
+      (account) => account.accountId === accountId,
+    );
+    if (!access) {
+      throw new ForbiddenException("Account access is not granted.");
+    }
+    if (!["OWNER", "ADMIN", "FINANCE"].includes(access.role)) {
+      throw new ForbiddenException(
+        "This account role cannot request payouts.",
+      );
+    }
+
+    const amount = Math.round(Number(input.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("amount must be a positive number.");
+    }
+
+    const assetCode = String(input.assetCode ?? "BRL")
+      .trim()
+      .toUpperCase();
+    const rail = String(input.rail ?? "PIX").trim().toUpperCase();
+    if (!["PIX", "CRYPTO"].includes(rail)) {
+      throw new BadRequestException("rail must be PIX or CRYPTO.");
+    }
+
+    const destination =
+      input.destination &&
+      typeof input.destination === "object" &&
+      !Array.isArray(input.destination)
+        ? (input.destination as Record<string, unknown>)
+        : {};
+
+    if (!Object.keys(destination).length) {
+      throw new BadRequestException("destination is required.");
+    }
+
+    await this.financial.ensureAccountFoundation(accountId);
+
+    return this.database.transaction(async (client) => {
+      const wallet = await client.query<{
+        wallet_id: string;
+        asset_id: string;
+        available: string;
+        reserved: string;
+      }>(
+        `
+        select
+          w.id as wallet_id,
+          a.id as asset_id,
+          wb.available::text,
+          wb.reserved::text
+        from public.wallets w
+        join public.assets a on a.id=w.asset_id
+        join public.wallet_balances wb on wb.wallet_id=w.id
+        where w.account_id=$1::uuid
+          and a.code=$2::varchar
+          and w.status='ACTIVE'
+        limit 1
+        for update of wb
+        `,
+        [accountId, assetCode],
+      );
+
+      const row = wallet.rows[0];
+      if (!row) {
+        throw new BadRequestException(
+          "No active wallet exists for this asset.",
+        );
+      }
+
+      const available = Number(row.available);
+      if (!Number.isFinite(available) || available < amount) {
+        throw new BadRequestException("Insufficient available balance.");
+      }
+
+      const externalReference =
+        "PB-OUT-" + randomUUID().replaceAll("-", "").slice(0, 16).toUpperCase();
+
+      const ticket = await client.query<{
+        id: string;
+        status: string;
+        created_at: string;
+      }>(
+        `
+        insert into controlplane.payout_requests(
+          id,account_id,wallet_id,asset_id,amount,destination_type,
+          destination_snapshot,status,external_reference,proof_metadata,
+          requested_by,created_at,updated_at
+        )
+        values(
+          gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,$4::numeric,$5::varchar,
+          $6::jsonb,'APPROVAL_REQUIRED',$7::varchar,$8::jsonb,
+          $9::uuid,now(),now()
+        )
+        returning id,status,created_at::text
+        `,
+        [
+          accountId,
+          row.wallet_id,
+          row.asset_id,
+          amount,
+          rail === "PIX" ? "PIX_MANUAL" : "CRYPTO_MANUAL",
+          JSON.stringify({
+            rail,
+            assetCode,
+            ...destination,
+          }),
+          externalReference,
+          JSON.stringify({
+            channel: "TELEGRAM_MANUAL",
+            automation: "PENDING",
+            requestedFrom: "CLIENT_PORTAL",
+          }),
+          context.authUserId,
+        ],
+      );
+
+      await client.query(
+        `
+        update public.wallet_balances
+        set
+          available=available-$2::numeric,
+          reserved=reserved+$2::numeric,
+          updated_at=now()
+        where wallet_id=$1::uuid
+        `,
+        [row.wallet_id, amount],
+      );
+
+      return {
+        success: true,
+        data: {
+          ticketId: ticket.rows[0].id,
+          reference: externalReference,
+          status: ticket.rows[0].status,
+          amount,
+          assetCode,
+          rail,
+          channel: "TELEGRAM_MANUAL",
+          createdAt: ticket.rows[0].created_at,
+          message:
+            "Payout reserved and queued for manual treasury processing.",
+        },
+      };
+    });
   }
 
   async accountOverview(context: ClientContext, accountId: string) {
