@@ -636,7 +636,7 @@ export class AdminService {
         jsonb_build_object(
           'secretReturnedOnce',true,
           'createdFrom','PIXBRASIL_ADMIN',
-          'mode','LIVE_PILOT_CAPABLE'
+          'mode','PRODUCTION'
         )
       )
       returning id
@@ -1110,7 +1110,7 @@ export class AdminService {
   }
 
   async riskOverview() {
-    const [accounts, webhooks, intents] = await Promise.all([
+    const [accounts, webhooks, intents, flags] = await Promise.all([
       this.database.query(
         `
         select
@@ -1138,7 +1138,20 @@ export class AdminService {
         order by status
         `,
       ),
+      this.database.query<{ key: string; enabled: boolean }>(
+        `
+        select key,enabled
+        from controlplane.feature_flags
+        where key in (
+          'routing_enforcement',
+          'manual_payouts',
+          'manual_ledger_adjustments'
+        )
+        `,
+      ),
     ]);
+
+    const enabled = new Map(flags.rows.map((row) => [row.key, row.enabled]));
 
     return {
       success: true,
@@ -1147,10 +1160,14 @@ export class AdminService {
         webhookPosture: webhooks.rows,
         paymentPosture: intents.rows,
         controls: {
-          liveExecution: false,
+          liveExecution: Boolean(enabled.get("routing_enforcement")),
+          manualPayouts: Boolean(enabled.get("manual_payouts")),
           automaticPayouts: false,
-          manualLedgerAdjustments: false,
-          note: "No dedicated risk scoring engine is active in the MVP.",
+          manualLedgerAdjustments: Boolean(
+            enabled.get("manual_ledger_adjustments"),
+          ),
+          note:
+            "Risk posture reflects live platform controls. Automated payout execution remains disabled while manual ticket processing is active.",
         },
       },
     };

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bot, Braces, CheckCircle2, Clock3, KeyRound, RadioTower, Store, Webhook } from "lucide-react";
+import { ArrowRight, Bot, Braces, CheckCircle2, KeyRound, RadioTower, Store, Webhook } from "lucide-react";
 import { DocsCard, DocsGrid, DocsSection, DocsShell } from "@/components/docs/docs-shell";
 import { CopyBlock, InlineCode } from "@/components/docs/copy-block";
 
@@ -30,13 +30,13 @@ export default function DocsHomePage() {
             <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Disponível</div>
             <p className="mt-2">Endpoints HTTPS assinados com HMAC-SHA256 e signing secret em Vault.</p>
           </DocsCard>
-          <DocsCard title="Provider execution" tone="gold">
-            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> LIVE / produção controlado</div>
-            <p className="mt-2">A Store só cria PIX real quando o modo de execução for explicitamente ativado.</p>
+          <DocsCard title="Provider execution" tone="green">
+            <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Produção</div>
+            <p className="mt-2">Stores ativas criam PIX real no provider definido pelo routing e retornam QR/Copia e Cola.</p>
           </DocsCard>
-          <DocsCard title="Payouts & settlement" tone="gold">
-            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> Guarded</div>
-            <p className="mt-2">Liberação e payout obedecem à release policy da Store; automações continuam feature-flagged.</p>
+          <DocsCard title="Settlement & payouts" tone="green">
+            <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Operacional</div>
+            <p className="mt-2">Settlement alimenta a Wallet BRL conforme a release policy. Payouts são processados por ticket manual nesta fase.</p>
           </DocsCard>
         </DocsGrid>
       </DocsSection>
