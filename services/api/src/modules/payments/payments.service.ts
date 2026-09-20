@@ -417,6 +417,7 @@ export class PaymentsService {
       status: string;
       attempt_status: string | null;
       provider_payment_id: string | null;
+      attempt_started_at: string | null;
     }>(
       `
       select
@@ -424,10 +425,11 @@ export class PaymentsService {
         pi.metadata,
         pi.status,
         pa.status as attempt_status,
-        pa.provider_payment_id
+        pa.provider_payment_id,
+        pa.started_at::text as attempt_started_at
       from pixbrasil.payment_intents pi
       left join lateral (
-        select pa0.status,pa0.provider_payment_id
+        select pa0.status,pa0.provider_payment_id,pa0.started_at
         from pixbrasil.provider_attempts pa0
         where pa0.payment_intent_id=pi.id
         order by pa0.attempt_no desc
@@ -458,6 +460,14 @@ export class PaymentsService {
         !row.provider_payment_id &&
         ["STARTED", "AMBIGUOUS"].includes(row.attempt_status)
       ) {
+        const attemptAgeMs = row.attempt_started_at
+          ? Date.now() - new Date(row.attempt_started_at).getTime()
+          : Number.POSITIVE_INFINITY;
+
+        if (row.attempt_status === "STARTED" && attemptAgeMs < 30_000) {
+          return this.loadChargeResult(row.id, true);
+        }
+
         await this.database.query(
           `
           update pixbrasil.payment_intents
