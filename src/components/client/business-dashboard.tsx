@@ -8,8 +8,6 @@ import {
   BookOpen,
   Building2,
   CalendarDays,
-  CheckCircle2,
-  CircleDollarSign,
   Clock3,
   Code2,
   CreditCard,
@@ -27,7 +25,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/logo";
 
@@ -198,7 +196,7 @@ export function BusinessDashboard({
       .slice(0, 20);
   }, [payments, query]);
 
-  async function submitPayout(event: React.FormEvent) {
+  async function submitPayout(event: FormEvent) {
     event.preventDefault();
     setPayoutBusy(true);
     setPayoutError("");
@@ -261,7 +259,7 @@ export function BusinessDashboard({
             <div className="mt-3 rounded-2xl border border-white/12 bg-white/[.035] p-3.5">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/10 text-emerald-300">
-                  <Building2 className="h-4.5 w-4.5" />
+                  <Building2 className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
                   <strong className="block truncate text-[12px]">{merchantName}</strong>
@@ -486,7 +484,7 @@ function Overview({
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="flex items-center gap-2 text-emerald-200">
-                <WalletCards className="h-4.5 w-4.5" />
+                <WalletCards className="h-4 w-4" />
                 <span className="text-[9px] font-bold uppercase tracking-[.13em]">
                   Wallet BRL Empresarial
                 </span>
@@ -653,7 +651,7 @@ function PayoutsView(props: {
   setPixKeyType: (value: string) => void;
   pixKey: string;
   setPixKey: (value: string) => void;
-  onSubmit: (event: React.FormEvent) => void;
+  onSubmit: (event: FormEvent) => void;
 }) {
   return (
     <div className="grid gap-4 xl:grid-cols-[.72fr_1.28fr]">
@@ -748,7 +746,7 @@ function MetricCard({ label, value, icon: Icon, detail, tone }: { label: string;
   );
 }
 
-function Panel({ title, subtitle, icon: Icon, children }: { title: string; subtitle: string; icon: typeof Store; children: React.ReactNode }) {
+function Panel({ title, subtitle, icon: Icon, children }: { title: string; subtitle: string; icon: typeof Store; children: ReactNode }) {
   return (
     <section className="overflow-hidden rounded-[20px] border border-[#dce6e3] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#e5ecea] px-5 py-4">
@@ -756,7 +754,7 @@ function Panel({ title, subtitle, icon: Icon, children }: { title: string; subti
           <strong className="block text-[12px]">{title}</strong>
           <span className="mt-1 block text-[8px] text-[#7a8d87]">{subtitle}</span>
         </div>
-        <Icon className="h-4.5 w-4.5 text-[#526b63]" />
+        <Icon className="h-4 w-4 text-[#526b63]" />
       </div>
       <div className="p-4 sm:p-5">{children}</div>
     </section>
