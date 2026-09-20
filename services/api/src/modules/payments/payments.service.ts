@@ -1051,6 +1051,9 @@ export class PaymentsService {
       provider_code: string | null;
       gateway_alias: string | null;
       outcome: string | null;
+      provider_payment_id: string | null;
+      provider_attempt_status: string | null;
+      response_metadata: Record<string, unknown> | null;
     }>(
       `
       select
@@ -1065,7 +1068,10 @@ export class PaymentsService {
         rp.name as policy_name,
         p.code as provider_code,
         gc.alias as gateway_alias,
-        rd.outcome
+        rd.outcome,
+        pa.provider_payment_id,
+        pa.status as provider_attempt_status,
+        pa.response_metadata
       from pixbrasil.payment_intents pi
       left join pixbrasil.stores s on s.id=pi.store_id
       left join lateral (
@@ -1078,6 +1084,13 @@ export class PaymentsService {
       left join pixbrasil.routing_policies rp on rp.id=rd.policy_id
       left join pixbrasil.gateway_connections gc on gc.id=rd.selected_connection_id
       left join public.providers p on p.id=gc.provider_id
+      left join lateral (
+        select pa0.*
+        from pixbrasil.provider_attempts pa0
+        where pa0.payment_intent_id=pi.id
+        order by pa0.attempt_no desc
+        limit 1
+      ) pa on true
       where pi.id=$1::uuid
       `,
       [paymentIntentId],
@@ -1091,7 +1104,10 @@ export class PaymentsService {
       data: {
         paymentIntentId: row.id,
         idempotentReplay,
-        status: row.outcome ?? row.status,
+        status:
+          row.outcome === "SHADOW_ONLY"
+            ? "SHADOW_ONLY"
+            : row.status,
         amount: Number(row.amount),
         currency: row.currency,
         reference: row.external_reference,
@@ -1100,13 +1116,27 @@ export class PaymentsService {
           name: row.store_name,
         },
         routing: {
-          mode: "SHADOW",
+          mode: String(row.metadata?.routingMode ?? "SHADOW"),
           policy: row.policy_name,
           providerCode: row.provider_code,
           gatewayAlias: row.gateway_alias,
           releaseClass: row.metadata?.releaseClass ?? null,
         },
-        economics: row.metadata?.shadowQuote ?? null,
+        economics:
+          row.metadata?.pricingQuote ??
+          row.metadata?.shadowQuote ??
+          null,
+        provider: row.provider_payment_id
+          ? {
+              paymentId: row.provider_payment_id,
+              attemptStatus: row.provider_attempt_status,
+              action:
+                row.response_metadata &&
+                typeof row.response_metadata.action === "object"
+                  ? row.response_metadata.action
+                  : row.metadata?.providerAction ?? null,
+            }
+          : null,
       },
     };
   }
