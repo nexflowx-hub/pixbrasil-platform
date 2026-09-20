@@ -713,60 +713,135 @@ export class PaymentsService {
       platformFeeProfile: config.fee_profile_code,
     };
 
-    await this.database.query(
-      `
-      update pixbrasil.payment_intents
-      set selected_connection_id=$2::uuid,
-          status='CREATED',
-          metadata=metadata || jsonb_build_object(
-            'routingMode','SHADOW',
-            'routingDecisionId',$3::text,
-            'shadowQuote',$4::jsonb,
-            'releaseProfile',$5::text,
-            'releaseClass',$6::text
-          ),
-          updated_at=now()
-      where id=$1::uuid
-      `,
-      [
-        paymentIntentId,
-        selected?.connectionId ?? null,
-        decision.rows[0]?.id ?? null,
-        JSON.stringify(quote),
-        config.release_profile_code,
-        config.release_class,
-      ],
-    );
+    if (!selected || !selectedRow) {
+      await this.database.query(
+        `
+        update pixbrasil.payment_intents
+        set status='FAILED',
+            metadata=metadata || jsonb_build_object(
+              'routingMode','LIVE',
+              'routingDecisionId',$2::text,
+              'routingFailure','NO_ROUTE',
+              'shadowQuote',$3::jsonb,
+              'releaseProfile',$4::text,
+              'releaseClass',$5::text
+            ),
+            updated_at=now()
+        where id=$1::uuid
+        `,
+        [
+          paymentIntentId,
+          decision.rows[0]?.id ?? null,
+          JSON.stringify(quote),
+          config.release_profile_code,
+          config.release_class,
+        ],
+      );
 
-    return {
-      success: true,
-      data: {
-        paymentIntentId,
-        idempotentReplay: false,
-        status: outcome,
-        amount: normalizedAmount,
-        currency: "BRL",
-        reference,
-        store: {
-          code: config.store_code,
-          name: config.store_name,
+      return {
+        success: true,
+        data: {
+          paymentIntentId,
+          idempotentReplay: false,
+          status: "NO_ROUTE",
+          amount: normalizedAmount,
+          currency: "BRL",
+          reference,
+          store: { code: config.store_code, name: config.store_name },
+          routing: {
+            mode: liveExecution ? "LIVE" : "SHADOW",
+            policy: config.policy_name,
+            policyVersion: config.policy_version,
+            providerCode: null,
+            gatewayAlias: null,
+            releaseClass: config.release_class,
+            crossReleaseClassFailover: false,
+          },
+          economics: quote,
+          release: {
+            profile: config.release_profile_code,
+            rules: releaseRules.rows,
+          },
         },
-        routing: {
-          mode: "SHADOW",
-          policy: config.policy_name,
-          policyVersion: config.policy_version,
-          providerCode: selectedRow?.provider_code ?? null,
-          gatewayAlias: selectedRow?.gateway_alias ?? null,
-          releaseClass: config.release_class,
-          crossReleaseClassFailover: false,
+      };
+    }
+
+    if (!liveExecution) {
+      await this.database.query(
+        `
+        update pixbrasil.payment_intents
+        set selected_connection_id=$2::uuid,
+            status='CREATED',
+            metadata=metadata || jsonb_build_object(
+              'routingMode','SHADOW',
+              'routingDecisionId',$3::text,
+              'shadowQuote',$4::jsonb,
+              'releaseProfile',$5::text,
+              'releaseClass',$6::text
+            ),
+            updated_at=now()
+        where id=$1::uuid
+        `,
+        [
+          paymentIntentId,
+          selected.connectionId,
+          decision.rows[0]?.id ?? null,
+          JSON.stringify(quote),
+          config.release_profile_code,
+          config.release_class,
+        ],
+      );
+
+      return {
+        success: true,
+        data: {
+          paymentIntentId,
+          idempotentReplay: false,
+          status: "SHADOW_ONLY",
+          amount: normalizedAmount,
+          currency: "BRL",
+          reference,
+          store: { code: config.store_code, name: config.store_name },
+          routing: {
+            mode: "SHADOW",
+            policy: config.policy_name,
+            policyVersion: config.policy_version,
+            providerCode: selectedRow.provider_code,
+            gatewayAlias: selectedRow.gateway_alias,
+            releaseClass: config.release_class,
+            crossReleaseClassFailover: false,
+          },
+          economics: quote,
+          release: {
+            profile: config.release_profile_code,
+            rules: releaseRules.rows,
+          },
         },
-        economics: quote,
-        release: {
-          profile: config.release_profile_code,
-          rules: releaseRules.rows,
-        },
+      };
+    }
+
+    return this.executeLiveCharge({
+      merchant,
+      paymentIntentId,
+      reference,
+      amount: normalizedAmount,
+      description: String(input.description ?? "").slice(0, 200),
+      payer: {
+        name: payerName,
+        taxId: payerTaxId,
+        email: String(input.payer?.email ?? "").trim() || undefined,
+        phone: String(input.payer?.phone ?? "").trim() || undefined,
       },
-    };
+      config,
+      quote,
+      releaseRules: releaseRules.rows,
+      routingDecisionId: decision.rows[0]?.id ?? null,
+      candidateRows: candidatesResult.rows,
+      eligibleConnectionIds: draft.eligible.map(
+        (candidate) => candidate.connectionId,
+      ),
+      preferredConnectionId: selected.connectionId,
+    });
   }
 
   private async loadShadowResult(
