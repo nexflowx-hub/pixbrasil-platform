@@ -145,6 +145,46 @@ export class AdminController {
     return this.admin.payoutsOverview();
   }
 
+  @Post("payouts/:payoutId/reject")
+  @RequirePermissions("payouts.confirm")
+  rejectPayout(
+    @Param("payoutId") payoutId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.rejectManualPayout(
+      payoutId,
+      body,
+      request.adminContext!,
+    );
+  }
+
+  @Post("payouts/:payoutId/mark-paid")
+  @RequirePermissions("payouts.confirm")
+  markPayoutPaid(
+    @Param("payoutId") payoutId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.markManualPayoutPaid(
+      payoutId,
+      body,
+      request.adminContext!,
+    );
+  }
+
+  @Post("payouts/:payoutId/confirm")
+  @RequirePermissions("payouts.confirm")
+  confirmPayout(
+    @Param("payoutId") payoutId: string,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.confirmManualPayout(
+      payoutId,
+      request.adminContext!,
+    );
+  }
+
   @Get("users")
   @RequirePermissions("users.read")
   users() {
