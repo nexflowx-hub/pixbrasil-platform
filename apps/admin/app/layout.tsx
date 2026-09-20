@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     default: "Control Plane | PiXBrasil",
     template: "%s | PiXBrasil Control Plane",
   },
-  description: "PiXBrasil operational and financial control plane.",
+  description: "PiXBrasil production operational and financial control plane.",
   robots: { index: false, follow: false, nocache: true },
 };
 
