@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("landing publica carrega sem links vazios e sem overflow horizontal", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Entrada via PIX/i })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Solicitar acesso/i })).toHaveAttribute("href", "/early-access");
+  await expect(page.getByRole("link", { name: /Abrir conta Business/i })).toHaveAttribute("href", "/early-access");
   expect(await page.locator('a[href="#"]').count()).toBe(0);
 
   const overflow = await page.evaluate(
