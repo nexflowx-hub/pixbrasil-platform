@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "PiXBrasil Merchant API",
-    "version": "1.0.0",
-    "description": "Server-side merchant API for PIX PaymentIntents, status and signed webhook endpoints. Live provider execution is controlled per Store."
+    "version": "1.1.0",
+    "description": "Production server-side merchant API for PIX PaymentIntents, provider execution, status and signed merchant webhooks."
   },
   "servers": [
     {
@@ -163,7 +163,7 @@
         },
         "responses": {
           "200": {
-            "description": "PaymentIntent resolved. Stores in SHADOW return SHADOW_ONLY and do not create a real PIX."
+            "description": "PIX PaymentIntent resolved. Active enforced Stores return PENDING_PAYMENT with provider.action containing the PIX copy-paste/QR information."
           },
           "400": {
             "description": "Invalid request."
@@ -176,6 +176,12 @@
           },
           "409": {
             "description": "Idempotency conflict."
+          },
+          "422": {
+            "description": "Provider rejected the PIX charge."
+          },
+          "503": {
+            "description": "Selected provider unavailable or credentials/runtime dependency unavailable."
           }
         }
       }
