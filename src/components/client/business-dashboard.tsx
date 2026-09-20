@@ -3,10 +3,7 @@
 import Link from "next/link";
 import {
   Activity,
-  AlertCircle,
-  ArrowDownLeft,
   ArrowLeftRight,
-  ArrowUpRight,
   Bell,
   Building2,
   CalendarClock,
@@ -18,7 +15,6 @@ import {
   GitBranch,
   HelpCircle,
   LayoutDashboard,
-  Link2,
   LoaderCircle,
   LogOut,
   MessageCircle,
@@ -810,18 +806,10 @@ function StoreReleaseTable({
   rows,
   stores,
 }: {
-  rows: ClientOverview["business"] extends infer B
-    ? B extends { storeFinancials: infer R }
-      ? R
-      : never
-    : never;
+  rows: NonNullable<ClientOverview["business"]>["storeFinancials"];
   stores: NonNullable<ClientOverview["business"]>["stores"];
 }) {
-  const financialRows = rows as NonNullable<
-    ClientOverview["business"]
-  >["storeFinancials"];
-
-  if (!financialRows.length) {
+  if (!rows.length) {
     return <EmptyState text="Nenhuma Store financeira encontrada." />;
   }
 
@@ -838,7 +826,7 @@ function StoreReleaseTable({
           </tr>
         </thead>
         <tbody>
-          {financialRows.map((row) => {
+          {rows.map((row) => {
             const store = stores.find((item) => item.id === row.store_id);
             return (
               <tr key={row.store_id} className="border-t border-[#edf1ef]">
