@@ -305,12 +305,10 @@ export function ClientPortal() {
             <div className="flex flex-col gap-4 rounded-[24px] border border-white/8 bg-[linear-gradient(145deg,#071719,#041011)] p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6">
               <div>
                 <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[#62BDA1]">
-                  {activeAccess?.accountType === "BUSINESS" ? "BUSINESS CONTROL" : "PERSONAL OVERVIEW"}
+                  PERSONAL OVERVIEW
                 </span>
                 <h1 className="mt-2 text-3xl font-semibold tracking-[-.045em]">
-                  {activeAccess?.accountType === "BUSINESS"
-                    ? activeAccess.merchant?.trade_name || "Conta Business"
-                    : "Sua conta PiXBrasil"}
+                  Sua conta PiXBrasil
                 </h1>
                 <p className="mt-2 text-[11px] text-[#718A83]">
                   {shortId(accountId)} · acesso {activeAccess?.role || "—"}
