@@ -846,6 +846,580 @@ export class PaymentsService {
     });
   }
 
+  private async loadCurrentResult(
+    merchant: MerchantApiContext,
+    paymentIntentId: string,
+    idempotentReplay: boolean,
+  ) {
+    const current = await this.getPayment(merchant, paymentIntentId);
+    if (current.data.routing.mode === "SHADOW") {
+      return this.loadShadowResult(paymentIntentId, idempotentReplay);
+    }
+
+    return {
+      ...current,
+      data: {
+        ...current.data,
+        idempotentReplay,
+      },
+    };
+  }
+
+  private async liveExecutionEnabled(
+    merchantId: string,
+    storeCode: string,
+    activationMode: "SHADOW" | "ENFORCED",
+  ) {
+    if (activationMode !== "ENFORCED") return false;
+
+    const flags = await this.database.query<{
+      key: string;
+      enabled: boolean;
+      config: Record<string, unknown>;
+    }>(
+      `
+      select key,enabled,config
+      from controlplane.feature_flags
+      where key in ('routing_enforcement','live_payment_execution')
+      `,
+    );
+
+    const routing = flags.rows.find(
+      (row) => row.key === "routing_enforcement",
+    );
+    const live = flags.rows.find(
+      (row) => row.key === "live_payment_execution",
+    );
+
+    if (!routing?.enabled || !live?.enabled) return false;
+
+    const config = asRecord(live.config);
+    const merchantIds = Array.isArray(config.merchantIds)
+      ? config.merchantIds.map(String)
+      : [];
+    const storeCodes = Array.isArray(config.storeCodes)
+      ? config.storeCodes.map((value) => String(value).toUpperCase())
+      : [];
+
+    if (merchantIds.length && !merchantIds.includes(merchantId)) return false;
+    if (storeCodes.length && !storeCodes.includes(storeCode.toUpperCase())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private async executeLiveCharge(params: {
+    merchant: MerchantApiContext;
+    paymentIntentId: string;
+    reference: string;
+    amount: number;
+    description: string;
+    payer: {
+      name: string;
+      taxId: string;
+      email?: string;
+      phone?: string;
+    };
+    config: StoreConfigRow;
+    quote: {
+      grossBrl: number;
+      providerRouteCostBrl: number;
+      platformFeeBrl: number;
+      estimatedMerchantNetBrl: number;
+      routeCostProfile: string;
+      platformFeeProfile: string | null;
+    };
+    releaseRules: ReleaseRuleRow[];
+    routingDecisionId: string | null;
+    candidateRows: CandidateRow[];
+    eligibleConnectionIds: string[];
+    preferredConnectionId: string;
+  }) {
+    const {
+      paymentIntentId,
+      reference,
+      amount,
+      description,
+      payer,
+      config,
+      quote,
+      releaseRules,
+      routingDecisionId,
+      candidateRows,
+      eligibleConnectionIds,
+      preferredConnectionId,
+    } = params;
+
+    const rank = new Map(
+      [
+        preferredConnectionId,
+        ...eligibleConnectionIds.filter(
+          (id) => id !== preferredConnectionId,
+        ),
+      ].map((id, index) => [id, index]),
+    );
+
+    const ordered = candidateRows
+      .filter((row) => rank.has(row.connection_id))
+      .sort(
+        (left, right) =>
+          (rank.get(left.connection_id) ?? 999) -
+          (rank.get(right.connection_id) ?? 999),
+      );
+
+    await this.database.query(
+      `
+      update pixbrasil.payment_intents
+      set selected_connection_id=$2::uuid,
+          status='PROVIDER_PENDING',
+          metadata=metadata || jsonb_build_object(
+            'routingMode','LIVE',
+            'routingDecisionId',$3::text,
+            'shadowQuote',$4::jsonb,
+            'releaseProfile',$5::text,
+            'releaseClass',$6::text,
+            'liveExecutionStartedAt',now()
+          ),
+          updated_at=now()
+      where id=$1::uuid
+      `,
+      [
+        paymentIntentId,
+        preferredConnectionId,
+        routingDecisionId,
+        JSON.stringify(quote),
+        config.release_profile_code,
+        config.release_class,
+      ],
+    );
+
+    for (let index = 0; index < ordered.length; index += 1) {
+      const candidate = ordered[index];
+      const credentials = await this.loadProviderCredentials(
+        candidate.connection_id,
+      );
+      const adapter = this.providers.get(candidate.provider_code);
+      const attemptNo = index + 1;
+      const requestFingerprint = createHash("sha256")
+        .update(
+          JSON.stringify({
+            paymentIntentId,
+            connectionId: candidate.connection_id,
+            reference,
+            amount,
+          }),
+        )
+        .digest("hex");
+
+      const attempt = await this.database.query<{ id: string }>(
+        `
+        insert into pixbrasil.provider_attempts(
+          payment_intent_id,routing_decision_id,gateway_connection_id,
+          attempt_no,status,request_fingerprint,response_metadata,started_at
+        )
+        values(
+          $1::uuid,$2::uuid,$3::uuid,$4::int,'STARTED',$5::text,'{}'::jsonb,now()
+        )
+        returning id
+        `,
+        [
+          paymentIntentId,
+          routingDecisionId,
+          candidate.connection_id,
+          attemptNo,
+          requestFingerprint,
+        ],
+      );
+
+      const result = await executeProviderAttempt({
+        adapter,
+        input: {
+          paymentIntentId,
+          externalReference: reference,
+          amount: amount.toFixed(2),
+          currency: "BRL",
+          payer,
+          description,
+          webhookUrl: this.providerWebhookUrl(candidate.provider_code),
+        },
+        credentials,
+        recoveryReference: paymentIntentId,
+      });
+
+      if (result.kind === "CREATED") {
+        const action = normalizePixAction(
+          candidate.provider_code,
+          result.payload,
+        );
+
+        await this.database.query(
+          `
+          update pixbrasil.provider_attempts
+          set status=$2::text,
+              provider_payment_id=$3::text,
+              provider_reference=$3::text,
+              retriable=false,
+              ambiguous=false,
+              response_metadata=$4::jsonb,
+              completed_at=now()
+          where id=$1::uuid
+          `,
+          [
+            attempt.rows[0].id,
+            result.recovered ? "RECOVERED" : "CREATED",
+            result.providerPaymentId,
+            JSON.stringify({
+              pix: action,
+              recovered: result.recovered,
+              providerCode: candidate.provider_code,
+              gatewayAlias: candidate.gateway_alias,
+            }),
+          ],
+        );
+
+        await this.database.query(
+          `
+          update pixbrasil.routing_decisions
+          set selected_connection_id=$2::uuid,
+              outcome='SELECTED',
+              evidence=evidence || jsonb_build_object(
+                'mode','LIVE',
+                'executedConnectionId',$2::text,
+                'providerCode',$3::text,
+                'attemptNo',$4::int
+              )
+          where id=$1::uuid
+          `,
+          [
+            routingDecisionId,
+            candidate.connection_id,
+            candidate.provider_code,
+            attemptNo,
+          ],
+        );
+
+        await this.database.query(
+          `
+          update pixbrasil.payment_intents
+          set selected_connection_id=$2::uuid,
+              status='PENDING_PAYMENT',
+              metadata=metadata || jsonb_build_object(
+                'providerCode',$3::text,
+                'gatewayAlias',$4::text,
+                'providerPaymentId',$5::text,
+                'liveExecutionCreatedAt',now()
+              ),
+              updated_at=now()
+          where id=$1::uuid
+          `,
+          [
+            paymentIntentId,
+            candidate.connection_id,
+            candidate.provider_code,
+            candidate.gateway_alias,
+            result.providerPaymentId,
+          ],
+        );
+
+        return {
+          success: true,
+          data: {
+            paymentIntentId,
+            idempotentReplay: false,
+            status: "PENDING_PAYMENT",
+            amount,
+            currency: "BRL",
+            reference,
+            store: {
+              code: config.store_code,
+              name: config.store_name,
+            },
+            routing: {
+              mode: "LIVE",
+              policy: config.policy_name,
+              policyVersion: config.policy_version,
+              providerCode: candidate.provider_code,
+              gatewayAlias: candidate.gateway_alias,
+              releaseClass: config.release_class,
+              crossReleaseClassFailover: false,
+              attemptNo,
+            },
+            provider: {
+              paymentId: result.providerPaymentId,
+              recovered: result.recovered,
+            },
+            action,
+            economics: quote,
+            release: {
+              profile: config.release_profile_code,
+              rules: releaseRules,
+            },
+          },
+        };
+      }
+
+      if (result.kind === "FINAL_REJECTION") {
+        await this.database.query(
+          `
+          update pixbrasil.provider_attempts
+          set status='REJECTED',
+              error_category=$2::text,
+              retriable=false,
+              ambiguous=false,
+              response_metadata=$3::jsonb,
+              completed_at=now()
+          where id=$1::uuid
+          `,
+          [
+            attempt.rows[0].id,
+            result.code ?? "PROVIDER_REJECTED",
+            JSON.stringify({ message: result.message ?? null }),
+          ],
+        );
+
+        await this.database.query(
+          `
+          update pixbrasil.payment_intents
+          set selected_connection_id=$2::uuid,
+              status='FAILED',
+              metadata=metadata || jsonb_build_object(
+                'providerCode',$3::text,
+                'providerFailure',$4::text,
+                'liveExecutionFinishedAt',now()
+              ),
+              updated_at=now()
+          where id=$1::uuid
+          `,
+          [
+            paymentIntentId,
+            candidate.connection_id,
+            candidate.provider_code,
+            result.code ?? "PROVIDER_REJECTED",
+          ],
+        );
+
+        return {
+          success: true,
+          data: {
+            paymentIntentId,
+            idempotentReplay: false,
+            status: "FAILED",
+            amount,
+            currency: "BRL",
+            reference,
+            store: {
+              code: config.store_code,
+              name: config.store_name,
+            },
+            routing: {
+              mode: "LIVE",
+              policy: config.policy_name,
+              policyVersion: config.policy_version,
+              providerCode: candidate.provider_code,
+              gatewayAlias: candidate.gateway_alias,
+              releaseClass: config.release_class,
+              crossReleaseClassFailover: false,
+              attemptNo,
+            },
+            provider: null,
+            action: null,
+            economics: quote,
+            release: {
+              profile: config.release_profile_code,
+              rules: releaseRules,
+            },
+          },
+        };
+      }
+
+      if (result.kind === "RECONCILIATION_REQUIRED") {
+        await this.database.query(
+          `
+          update pixbrasil.provider_attempts
+          set status='AMBIGUOUS',
+              error_category='AMBIGUOUS_CREATE',
+              retriable=false,
+              ambiguous=true,
+              response_metadata=$2::jsonb,
+              completed_at=now()
+          where id=$1::uuid
+          `,
+          [
+            attempt.rows[0].id,
+            JSON.stringify({ reason: result.reason }),
+          ],
+        );
+
+        await this.database.query(
+          `
+          update pixbrasil.payment_intents
+          set selected_connection_id=$2::uuid,
+              status='RECONCILIATION_REQUIRED',
+              metadata=metadata || jsonb_build_object(
+                'providerCode',$3::text,
+                'reconciliationReason',$4::text,
+                'liveExecutionFinishedAt',now()
+              ),
+              updated_at=now()
+          where id=$1::uuid
+          `,
+          [
+            paymentIntentId,
+            candidate.connection_id,
+            candidate.provider_code,
+            result.reason,
+          ],
+        );
+
+        return {
+          success: true,
+          data: {
+            paymentIntentId,
+            idempotentReplay: false,
+            status: "RECONCILIATION_REQUIRED",
+            amount,
+            currency: "BRL",
+            reference,
+            store: {
+              code: config.store_code,
+              name: config.store_name,
+            },
+            routing: {
+              mode: "LIVE",
+              policy: config.policy_name,
+              policyVersion: config.policy_version,
+              providerCode: candidate.provider_code,
+              gatewayAlias: candidate.gateway_alias,
+              releaseClass: config.release_class,
+              crossReleaseClassFailover: false,
+              attemptNo,
+            },
+            provider: null,
+            action: null,
+            economics: quote,
+            release: {
+              profile: config.release_profile_code,
+              rules: releaseRules,
+            },
+          },
+        };
+      }
+
+      await this.database.query(
+        `
+        update pixbrasil.provider_attempts
+        set status='UNAVAILABLE',
+            error_category='PROVIDER_UNAVAILABLE',
+            retriable=true,
+            ambiguous=false,
+            response_metadata=$2::jsonb,
+            completed_at=now()
+        where id=$1::uuid
+        `,
+        [
+          attempt.rows[0].id,
+          JSON.stringify({ reason: result.reason }),
+        ],
+      );
+    }
+
+    await this.database.query(
+      `
+      update pixbrasil.payment_intents
+      set status='FAILED',
+          metadata=metadata || jsonb_build_object(
+            'providerFailure','ALL_ELIGIBLE_ROUTES_UNAVAILABLE',
+            'liveExecutionFinishedAt',now()
+          ),
+          updated_at=now()
+      where id=$1::uuid
+      `,
+      [paymentIntentId],
+    );
+
+    return {
+      success: true,
+      data: {
+        paymentIntentId,
+        idempotentReplay: false,
+        status: "FAILED",
+        amount,
+        currency: "BRL",
+        reference,
+        store: {
+          code: config.store_code,
+          name: config.store_name,
+        },
+        routing: {
+          mode: "LIVE",
+          policy: config.policy_name,
+          policyVersion: config.policy_version,
+          providerCode: null,
+          gatewayAlias: null,
+          releaseClass: config.release_class,
+          crossReleaseClassFailover: false,
+        },
+        provider: null,
+        action: null,
+        economics: quote,
+        release: {
+          profile: config.release_profile_code,
+          rules: releaseRules,
+        },
+      },
+    };
+  }
+
+  private async loadProviderCredentials(connectionId: string) {
+    const result = await this.database.query<{
+      decrypted_secret: string | null;
+    }>(
+      `
+      select v.decrypted_secret
+      from pixbrasil.gateway_connections gc
+      left join vault.decrypted_secrets v on v.id=gc.vault_secret_id
+      where gc.id=$1::uuid
+        and gc.status='ACTIVE'
+      limit 1
+      `,
+      [connectionId],
+    );
+
+    const secret = result.rows[0]?.decrypted_secret;
+    if (!secret) {
+      throw new ConflictException(
+        "Provider credentials are unavailable for the selected route.",
+      );
+    }
+
+    try {
+      return JSON.parse(secret) as Record<string, unknown>;
+    } catch {
+      throw new ConflictException(
+        "Provider credential payload is malformed.",
+      );
+    }
+  }
+
+  private providerWebhookUrl(providerCode: string) {
+    const base = (
+      process.env.PUBLIC_API_URL ??
+      process.env.PIXBRASIL_PUBLIC_API_URL ??
+      "https://api.pixbrasil.org"
+    ).replace(/\/+$/, "");
+
+    const provider = providerCode.toUpperCase();
+    const path =
+      provider === "MISTICPAY"
+        ? "/api/v1/webhooks/misticpay"
+        : provider === "PIXGO"
+          ? "/api/v1/webhooks/pixgo"
+          : `/api/v1/webhooks/${provider.toLowerCase()}`;
+
+    return base + path;
+  }
+
   private async loadShadowResult(
     paymentIntentId: string,
     idempotentReplay: boolean,
