@@ -52,9 +52,9 @@ test("Telegram payout notification masks PIX key and links to Admin ticket", asy
     assert.ok(payload.text);
     assert.equal(payload.text!.includes(fullPixKey), false);
     assert.match(payload.text!, /mer••••••.com/);
-    assert.match(
-      payload.text!,
-      /https://admin.pixbrasil.org/payouts?ticket=/,
+    assert.equal(
+      payload.text!.includes("https://admin.pixbrasil.org/payouts?ticket="),
+      true,
     );
   } finally {
     globalThis.fetch = originalFetch;
