@@ -1,10 +1,20 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import type { ClientContext } from "../client-auth/client-auth.types";
 import { DatabaseService } from "../database/database.service";
+
+function requiredIdempotency(value: string | undefined) {
+  const parsed = String(value ?? "").trim();
+  if (!parsed) {
+    throw new BadRequestException("Idempotency-Key is required.");
+  }
+  return parsed.slice(0, 120);
+}
 
 @Injectable()
 export class ClientService {
@@ -33,12 +43,14 @@ export class ClientService {
                 `,
                 [access.accountId],
               )
-            : { rows: [] as Array<{
-                merchant_id: string;
-                trade_name: string | null;
-                tier_code: string;
-                merchant_status: string;
-              }> };
+            : {
+                rows: [] as Array<{
+                  merchant_id: string;
+                  trade_name: string | null;
+                  tier_code: string;
+                  merchant_status: string;
+                }>,
+              };
 
         return {
           ...access,
@@ -66,6 +78,10 @@ export class ClientService {
     if (!access) {
       throw new ForbiddenException("Account access is not granted.");
     }
+
+    await this.database
+      .query("select pixbrasil.release_due_settlements(100)")
+      .catch(() => undefined);
 
     const accountResult = await this.database.query<{
       id: string;
@@ -155,6 +171,7 @@ export class ClientService {
       provider_reference: string | null;
       created_at: string;
       completed_at: string | null;
+      metadata: Record<string, unknown> | null;
     }>(
       `
       select
@@ -167,14 +184,29 @@ export class ClientService {
         t.fee_amount::text,
         t.provider_reference,
         t.created_at::text,
-        t.completed_at::text
+        t.completed_at::text,
+        t.metadata
       from public.transactions t
       join public.assets ass on ass.id=t.asset_id
       where t.account_id=$1::uuid
       order by t.created_at desc
-      limit 25
+      limit 50
       `,
       [accountId],
+    );
+
+    const flagsResult = await this.database.query<{
+      key: string;
+      enabled: boolean;
+    }>(
+      `
+      select key,enabled
+      from controlplane.feature_flags
+      where key in ('routing_enforcement','manual_payouts')
+      `,
+    );
+    const flags = Object.fromEntries(
+      flagsResult.rows.map((row) => [row.key, row.enabled]),
     );
 
     let business: Record<string, unknown> | null = null;
@@ -197,73 +229,218 @@ export class ClientService {
 
       const merchant = merchantResult.rows[0];
       if (merchant) {
-        const stores = await this.database.query(
-          `
-          select
-            s.id,
-            s.code,
-            s.name,
-            s.status,
-            s.currency,
-            gc.alias as gateway_alias,
-            p.code as provider_code,
-            rel.code as release_profile,
-            rel.release_class,
-            rcp.code as route_cost_profile,
-            rp.activation_mode as routing_mode
-          from pixbrasil.stores s
-          left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
-          left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
-          left join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
-          left join lateral (
-            select *
-            from pixbrasil.routing_policies rp0
-            where rp0.store_id=s.id and rp0.status='ACTIVE'
-            order by rp0.priority asc,rp0.version desc
-            limit 1
-          ) rp on true
-          left join lateral (
-            select gc0.*,p0.code as provider_code
-            from pixbrasil.routing_routes rr0
-            join pixbrasil.gateway_connections gc0 on gc0.id=rr0.gateway_connection_id
-            join public.providers p0 on p0.id=gc0.provider_id
-            where rr0.policy_id=rp.id and rr0.enabled=true
-            order by rr0.priority asc
-            limit 1
-          ) route on true
-          left join pixbrasil.gateway_connections gc on gc.id=route.id
-          left join public.providers p on p.id=gc.provider_id
-          where s.merchant_id=$1::uuid
-          order by s.code
-          `,
-          [merchant.merchant_id],
-        );
+        const [stores, payments, storeFinancials, gateways, cashflow, payouts] =
+          await Promise.all([
+            this.database.query(
+              `
+              select
+                s.id,
+                s.code,
+                s.name,
+                s.status,
+                s.currency,
+                gc.alias as gateway_alias,
+                p.code as provider_code,
+                rel.code as release_profile,
+                rel.release_class,
+                rcp.code as route_cost_profile,
+                rp.activation_mode as routing_mode,
+                coalesce(gc.metadata->>'lastConnectionHealth','UNKNOWN') as provider_health,
+                coalesce((gc.metadata->>'routingEligible')::boolean,false) as routing_eligible
+              from pixbrasil.stores s
+              left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
+              left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
+              left join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
+              left join lateral (
+                select *
+                from pixbrasil.routing_policies rp0
+                where rp0.store_id=s.id and rp0.status='ACTIVE'
+                order by rp0.priority asc,rp0.version desc
+                limit 1
+              ) rp on true
+              left join lateral (
+                select gc0.*
+                from pixbrasil.routing_routes rr0
+                join pixbrasil.gateway_connections gc0
+                  on gc0.id=rr0.gateway_connection_id
+                where rr0.policy_id=rp.id and rr0.enabled=true
+                order by rr0.priority asc
+                limit 1
+              ) gc on true
+              left join public.providers p on p.id=gc.provider_id
+              where s.merchant_id=$1::uuid
+              order by s.code
+              `,
+              [merchant.merchant_id],
+            ),
+            this.database.query(
+              `
+              select
+                pi.id,
+                pi.external_reference,
+                pi.amount::text,
+                pi.currency,
+                pi.status,
+                pi.payment_method,
+                s.code as store_code,
+                p.code as provider_code,
+                st.net_brl::text,
+                st.status as settlement_status,
+                st.available_at::text,
+                pi.created_at::text,
+                pi.updated_at::text
+              from pixbrasil.payment_intents pi
+              left join pixbrasil.stores s on s.id=pi.store_id
+              left join pixbrasil.gateway_connections gc
+                on gc.id=pi.selected_connection_id
+              left join public.providers p on p.id=gc.provider_id
+              left join pixbrasil.settlements st
+                on st.payment_intent_id=pi.id
+              where pi.merchant_id=$1::uuid
+              order by pi.created_at desc
+              limit 50
+              `,
+              [merchant.merchant_id],
+            ),
+            this.database.query(
+              `
+              select
+                s.id as store_id,
+                s.code as store_code,
+                s.name as store_name,
+                coalesce(sum(st.net_brl) filter (where st.status='AVAILABLE'),0)::text
+                  as available_brl,
+                coalesce(sum(st.net_brl) filter (
+                  where st.status in ('PENDING','CONVERSION_PENDING','ONCHAIN_PENDING')
+                ),0)::text as pending_brl,
+                min(st.available_at) filter (
+                  where st.status in ('PENDING','CONVERSION_PENDING','ONCHAIN_PENDING')
+                )::text as next_release_at,
+                count(st.id) filter (where st.status='AVAILABLE')::int
+                  as available_count,
+                count(st.id) filter (
+                  where st.status in ('PENDING','CONVERSION_PENDING','ONCHAIN_PENDING')
+                )::int as pending_count
+              from pixbrasil.stores s
+              left join pixbrasil.payment_intents pi on pi.store_id=s.id
+              left join pixbrasil.settlements st on st.payment_intent_id=pi.id
+              where s.merchant_id=$1::uuid
+              group by s.id,s.code,s.name
+              order by s.code
+              `,
+              [merchant.merchant_id],
+            ),
+            this.database.query(
+              `
+              select distinct on (p.code)
+                p.code as provider_code,
+                gc.alias as gateway_alias,
+                gc.status as gateway_status,
+                coalesce(gc.metadata->>'lastConnectionHealth','UNKNOWN') as health,
+                coalesce(gc.metadata->>'lastHealthLatencyMs','0')::int as latency_ms,
+                coalesce((gc.metadata->>'routingEligible')::boolean,false)
+                  as routing_eligible
+              from pixbrasil.stores s
+              join pixbrasil.routing_policies rp
+                on rp.store_id=s.id and rp.status='ACTIVE'
+              join pixbrasil.routing_routes rr
+                on rr.policy_id=rp.id and rr.enabled=true
+              join pixbrasil.gateway_connections gc
+                on gc.id=rr.gateway_connection_id
+              join public.providers p on p.id=gc.provider_id
+              where s.merchant_id=$1::uuid
+              order by p.code,gc.updated_at desc
+              `,
+              [merchant.merchant_id],
+            ),
+            this.database.query(
+              `
+              with days as (
+                select generate_series(
+                  current_date-29,
+                  current_date,
+                  interval '1 day'
+                )::date as day
+              ),
+              incoming as (
+                select
+                  st.created_at::date as day,
+                  sum(st.net_brl) as amount
+                from pixbrasil.settlements st
+                join pixbrasil.payment_intents pi
+                  on pi.id=st.payment_intent_id
+                where pi.merchant_id=$1::uuid
+                  and st.created_at >= current_date-29
+                group by st.created_at::date
+              ),
+              outgoing as (
+                select
+                  coalesce(pr.paid_at,pr.confirmed_at,pr.created_at)::date as day,
+                  sum(pr.amount) as amount
+                from controlplane.payout_requests pr
+                where pr.account_id=$2::uuid
+                  and pr.status in ('PAID','CONFIRMED')
+                  and coalesce(pr.paid_at,pr.confirmed_at,pr.created_at)
+                    >= current_date-29
+                group by 1
+              )
+              select
+                d.day::text,
+                coalesce(i.amount,0)::text as incoming_brl,
+                coalesce(o.amount,0)::text as outgoing_brl
+              from days d
+              left join incoming i on i.day=d.day
+              left join outgoing o on o.day=d.day
+              order by d.day
+              `,
+              [merchant.merchant_id, accountId],
+            ),
+            this.database.query(
+              `
+              select
+                pr.id,
+                pr.amount::text,
+                ass.code as asset_code,
+                pr.destination_type,
+                pr.destination_snapshot,
+                pr.status,
+                pr.external_reference,
+                pr.created_at::text,
+                pr.updated_at::text,
+                pr.paid_at::text,
+                pr.confirmed_at::text
+              from controlplane.payout_requests pr
+              join public.assets ass on ass.id=pr.asset_id
+              where pr.account_id=$1::uuid
+              order by pr.created_at desc
+              limit 25
+              `,
+              [accountId],
+            ),
+          ]);
 
-        const payments = await this.database.query(
+        const telegramResult = await this.database.query<{ username: string }>(
           `
-          select
-            pi.id,
-            pi.external_reference,
-            pi.amount::text,
-            pi.currency,
-            pi.status,
-            pi.payment_method,
-            s.code as store_code,
-            pi.created_at::text,
-            pi.updated_at::text
-          from pixbrasil.payment_intents pi
-          left join pixbrasil.stores s on s.id=pi.store_id
-          where pi.merchant_id=$1::uuid
-          order by pi.created_at desc
-          limit 25
+          select trim(both '"' from value::text) as username
+          from controlplane.system_settings
+          where key='payout_telegram_username'
+          limit 1
           `,
-          [merchant.merchant_id],
         );
 
         business = {
           merchant,
           stores: stores.rows,
           payments: payments.rows,
+          storeFinancials: storeFinancials.rows,
+          gateways: gateways.rows,
+          cashflow30d: cashflow.rows,
+          payouts: payouts.rows,
+          payoutDesk: {
+            mode: "MANUAL_TELEGRAM",
+            telegramUsername: telegramResult.rows[0]?.username ?? null,
+            automaticPayouts: false,
+          },
         };
       }
     }
@@ -277,14 +454,152 @@ export class ClientService {
         transactions: txResult.rows,
         business,
         capabilities: {
-          financialWritesEnabled: false,
-          depositsEnabled: false,
-          withdrawalsEnabled: false,
+          financialWritesEnabled: Boolean(flags.routing_enforcement),
+          depositsEnabled:
+            account.type === "BUSINESS" && Boolean(flags.routing_enforcement),
+          withdrawalsEnabled: account.type === "BUSINESS",
+          payoutMode:
+            account.type === "BUSINESS" ? "MANUAL_TELEGRAM" : "UNAVAILABLE",
           exchangeEnabled: false,
           note:
-            "MVP client portal is read-only while payment execution, settlement and payout guardrails are validated.",
+            account.type === "BUSINESS"
+              ? "PIX production routing is enabled by Store policy. Payouts are processed by manual ticket until automatic payout rails are enabled."
+              : "Personal financial capabilities follow the account policy profile.",
         },
       },
     };
+  }
+
+  async createPayoutTicket(
+    context: ClientContext,
+    accountId: string,
+    idempotencyKeyValue: string | undefined,
+    input: Record<string, unknown>,
+  ) {
+    const access = context.accounts.find(
+      (account) => account.accountId === accountId,
+    );
+    if (
+      !access ||
+      access.accountType !== "BUSINESS" ||
+      !["OWNER", "ADMIN", "FINANCE"].includes(access.role)
+    ) {
+      throw new ForbiddenException("Payout access is not granted.");
+    }
+
+    const amount = Number(input.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("amount must be a positive BRL value.");
+    }
+    const normalizedAmount = Math.round(amount * 100) / 100;
+    const rail = String(input.rail ?? "PIX").trim().toUpperCase();
+    if (!["PIX", "CRYPTO"].includes(rail)) {
+      throw new BadRequestException("rail must be PIX or CRYPTO.");
+    }
+    const idempotencyKey = requiredIdempotency(idempotencyKeyValue);
+
+    try {
+      const result = await this.database.query<{
+        out_payout_id: string;
+        out_status: string;
+        out_amount: string;
+        out_asset_code: string;
+        out_external_reference: string;
+      }>(
+        `
+        select *
+        from controlplane.create_manual_payout_ticket(
+          $1::uuid,$2::uuid,$3::numeric,$4::text,$5::text
+        )
+        `,
+        [
+          accountId,
+          context.authUserId,
+          normalizedAmount,
+          rail,
+          idempotencyKey,
+        ],
+      );
+
+      const ticket = result.rows[0];
+      const telegramResult = await this.database.query<{ username: string }>(
+        `
+        select trim(both '"' from value::text) as username
+        from controlplane.system_settings
+        where key='payout_telegram_username'
+        limit 1
+        `,
+      );
+      const username = telegramResult.rows[0]?.username ?? "";
+      const message =
+        `PiXBrasil Payout Ticket\n` +
+        `Ticket: ${ticket.out_payout_id}\n` +
+        `Conta: ${accountId}\n` +
+        `Valor reservado: R$ ${Number(ticket.out_amount).toFixed(2)}\n` +
+        `Rail solicitado: ${rail}\n\n` +
+        "Envie neste atendimento os dados do destino para processamento manual.";
+
+      return {
+        success: true,
+        data: {
+          payoutId: ticket.out_payout_id,
+          status: ticket.out_status,
+          amount: Number(ticket.out_amount),
+          assetCode: ticket.out_asset_code,
+          reference: ticket.out_external_reference,
+          rail,
+          reserved: true,
+          telegramUsername: username || null,
+          telegramUrl: username
+            ? `https://t.me/${username}?text=${encodeURIComponent(message)}`
+            : null,
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("Insufficient available balance")) {
+        throw new ConflictException("Insufficient available BRL balance.");
+      }
+      if (message.includes("access is not granted")) {
+        throw new ForbiddenException("Payout access is not granted.");
+      }
+      throw error;
+    }
+  }
+
+  async cancelPayoutTicket(
+    context: ClientContext,
+    accountId: string,
+    payoutId: string,
+  ) {
+    const access = context.accounts.find(
+      (account) => account.accountId === accountId,
+    );
+    if (
+      !access ||
+      access.accountType !== "BUSINESS" ||
+      !["OWNER", "ADMIN", "FINANCE"].includes(access.role)
+    ) {
+      throw new ForbiddenException("Payout access is not granted.");
+    }
+
+    try {
+      await this.database.query(
+        `
+        select controlplane.cancel_manual_payout_ticket($1::uuid,$2::uuid)
+        `,
+        [payoutId, context.authUserId],
+      );
+      return { success: true, data: { payoutId, status: "CANCELED" } };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      if (message.includes("not found")) {
+        throw new NotFoundException("Payout ticket not found.");
+      }
+      if (message.includes("no longer be canceled")) {
+        throw new ConflictException("Payout ticket can no longer be canceled.");
+      }
+      throw error;
+    }
   }
 }
