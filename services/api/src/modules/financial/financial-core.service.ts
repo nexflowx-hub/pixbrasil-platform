@@ -235,14 +235,13 @@ export class FinancialCoreService {
             direction,amount,created_at
           )
           values
-            (gen_random_uuid(),$1::uuid,$2::uuid,$5::uuid,'DEBIT',$6::numeric,now()),
-            (gen_random_uuid(),$1::uuid,$3::uuid,$5::uuid,'CREDIT',$7::numeric,now())
+            (gen_random_uuid(),$1::uuid,$2::uuid,$4::uuid,'DEBIT',$5::numeric,now()),
+            (gen_random_uuid(),$1::uuid,$3::uuid,$4::uuid,'CREDIT',$6::numeric,now())
           `,
           [
             ledgerTransactionId,
             foundation.clearingLedgerId,
             foundation.customerLedgerId,
-            foundation.revenueLedgerId,
             foundation.assetId,
             providerSettlementNet,
             net,
