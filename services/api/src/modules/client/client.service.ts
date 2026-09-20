@@ -450,6 +450,7 @@ export class ClientService {
     context: ClientContext,
     accountId: string,
     body: Record<string, unknown>,
+    idempotencyKeyValue?: string,
   ) {
     const access = context.accounts.find((item) => item.accountId === accountId);
     if (!access) throw new ForbiddenException("Account access is not granted.");
@@ -464,6 +465,11 @@ export class ClientService {
       throw new ConflictException("Payout requests are temporarily unavailable.");
     }
 
+    const requestKey = String(idempotencyKeyValue ?? "").trim().slice(0, 200);
+    if (!requestKey) {
+      throw new BadRequestException("Idempotency-Key is required.");
+    }
+
     const amount = Math.round(Number(body.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException("amount must be a positive BRL value.");
@@ -476,83 +482,204 @@ export class ClientService {
     const pixKeyType = normalizePixKeyType(body.pixKeyType);
     const maskedKey = maskDestination(pixKey);
 
-    const result = await this.database.query<{
+    const existing = await this.database.query<{
       id: string;
       amount: string;
       status: string;
+      destination_snapshot: Record<string, unknown>;
       created_at: string;
+      proof_metadata: Record<string, unknown>;
     }>(
       `
-      with asset as (
-        select id from public.assets where code='BRL' limit 1
-      ),
-      wallet as (
-        select w.id,w.account_id,w.asset_id
+      select id,amount::text,status,destination_snapshot,created_at::text,proof_metadata
+      from controlplane.payout_requests
+      where account_id=$1::uuid and request_key=$2::varchar
+      limit 1
+      `,
+      [accountId, requestKey],
+    );
+
+    if (existing.rows[0]) {
+      const row = existing.rows[0];
+      return {
+        success: true,
+        data: {
+          payoutId: row.id,
+          amount: Number(row.amount),
+          currency: "BRL",
+          status: row.status,
+          destination: row.destination_snapshot,
+          idempotentReplay: true,
+          ticket: {
+            channel: "TELEGRAM_MANUAL",
+            notificationDelivered: Boolean(
+              row.proof_metadata?.telegramDelivered,
+            ),
+          },
+          createdAt: row.created_at,
+        },
+      };
+    }
+
+    const payout = await this.database.transaction(async (client) => {
+      const walletResult = await client.query<{
+        wallet_id: string;
+        asset_id: string;
+      }>(
+        `
+        select w.id wallet_id,w.asset_id
         from public.wallets w
-        join asset a on a.id=w.asset_id
+        join public.assets ass on ass.id=w.asset_id and ass.code='BRL'
         where w.account_id=$1::uuid and w.status='ACTIVE'
         limit 1
-      ),
-      reserved as (
-        update public.wallet_balances wb
-        set available=wb.available-$2::numeric,
-            reserved=wb.reserved+$2::numeric,
-            updated_at=current_timestamp
-        from wallet w
-        where wb.wallet_id=w.id
-          and wb.available >= $2::numeric
-        returning wb.wallet_id
-      ),
-      secret as (
-        select vault.create_secret(
-          jsonb_build_object(
-            'pixKey',$3::text,
-            'pixKeyType',$4::text
-          )::text,
-          'pixbrasil-payout-' || gen_random_uuid()::text,
-          'PiXBrasil payout destination'
-        )::uuid id
-        where exists(select 1 from reserved)
-      ),
-      inserted as (
+        `,
+        [accountId],
+      );
+
+      const wallet = walletResult.rows[0];
+      if (!wallet) {
+        throw new ConflictException("Active BRL Wallet is unavailable.");
+      }
+
+      const draft = await client.query<{
+        id: string;
+        amount: string;
+        status: string;
+        created_at: string;
+      }>(
+        `
         insert into controlplane.payout_requests(
           id,account_id,wallet_id,asset_id,amount,destination_type,
-          destination_snapshot,destination_vault_secret_id,status,
-          proof_metadata,requested_by,created_at,updated_at
+          destination_snapshot,status,request_key,proof_metadata,
+          requested_by,created_at,updated_at
         )
-        select
-          gen_random_uuid(),$1::uuid,w.id,w.asset_id,$2::numeric,'PIX',
+        values(
+          gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,$4::numeric,'PIX',
           jsonb_build_object(
-            'pixKeyType',$4::text,
-            'pixKeyMasked',$5::text
+            'pixKeyType',$5::text,
+            'pixKeyMasked',$6::text
           ),
-          s.id,
-          'APPROVAL_REQUIRED',
+          'DRAFT',$7::varchar,
           jsonb_build_object(
             'channel','TELEGRAM_MANUAL',
             'mode','MANUAL_TICKET',
             'requestedFrom','CLIENT_PORTAL'
           ),
-          $6::uuid,now(),now()
-        from wallet w,secret s
-        where exists(select 1 from reserved)
-        returning id,amount,status,created_at
-      )
-      select id,amount::text,status,created_at::text from inserted
-      `,
-      [
-        accountId,
-        amount,
-        pixKey,
-        pixKeyType,
-        maskedKey,
-        context.authUserId,
-      ],
-    );
+          $8::uuid,now(),now()
+        )
+        on conflict (account_id,request_key)
+          where request_key is not null
+        do nothing
+        returning id,amount::text,status,created_at::text
+        `,
+        [
+          accountId,
+          wallet.wallet_id,
+          wallet.asset_id,
+          amount,
+          pixKeyType,
+          maskedKey,
+          requestKey,
+          context.authUserId,
+        ],
+      );
 
-    const payout = result.rows[0];
-    if (!payout) {
-      throw new ConflictException("Insufficient available BRL balance.");
+      if (!draft.rows[0]) {
+        const duplicate = await client.query<{
+          id: string;
+          amount: string;
+          status: string;
+          created_at: string;
+        }>(
+          `
+          select id,amount::text,status,created_at::text
+          from controlplane.payout_requests
+          where account_id=$1::uuid and request_key=$2::varchar
+          limit 1
+          `,
+          [accountId, requestKey],
+        );
+        if (!duplicate.rows[0]) {
+          throw new ConflictException("Unable to resolve idempotent payout.");
+        }
+        return { ...duplicate.rows[0], replay: true };
+      }
+
+      const reserved = await client.query(
+        `
+        update public.wallet_balances
+        set available=available-$2::numeric,
+            reserved=reserved+$2::numeric,
+            updated_at=current_timestamp
+        where wallet_id=$1::uuid
+          and available >= $2::numeric
+        returning wallet_id
+        `,
+        [wallet.wallet_id, amount],
+      );
+      if (!reserved.rows[0]) {
+        throw new ConflictException("Insufficient available BRL balance.");
+      }
+
+      const secret = await client.query<{ id: string }>(
+        `
+        select vault.create_secret(
+          jsonb_build_object(
+            'pixKey',$1::text,
+            'pixKeyType',$2::text
+          )::text,
+          'pixbrasil-payout-' || gen_random_uuid()::text,
+          'PiXBrasil payout destination'
+        )::text as id
+        `,
+        [pixKey, pixKeyType],
+      );
+      const secretId = secret.rows[0]?.id;
+      if (!secretId) {
+        throw new ConflictException("Unable to secure payout destination.");
+      }
+
+      const finalized = await client.query<{
+        id: string;
+        amount: string;
+        status: string;
+        created_at: string;
+      }>(
+        `
+        update controlplane.payout_requests
+        set destination_vault_secret_id=$2::uuid,
+            status='APPROVAL_REQUIRED',
+            updated_at=now()
+        where id=$1::uuid and status='DRAFT'
+        returning id,amount::text,status,created_at::text
+        `,
+        [draft.rows[0].id, secretId],
+      );
+
+      if (!finalized.rows[0]) {
+        throw new ConflictException("Unable to finalize payout ticket.");
+      }
+
+      return { ...finalized.rows[0], replay: false };
+    });
+
+    if (payout.replay) {
+      return {
+        success: true,
+        data: {
+          payoutId: payout.id,
+          amount: Number(payout.amount),
+          currency: "BRL",
+          status: payout.status,
+          destination: { type: pixKeyType, masked: maskedKey },
+          idempotentReplay: true,
+          ticket: {
+            channel: "TELEGRAM_MANUAL",
+            notificationDelivered: false,
+          },
+          createdAt: payout.created_at,
+        },
+      };
     }
 
     const telegram = await this.notifyPayoutTelegram({
@@ -565,6 +692,20 @@ export class ClientService {
       pixKey,
     });
 
+    await this.database.query(
+      `
+      update controlplane.payout_requests
+      set proof_metadata=coalesce(proof_metadata,'{}'::jsonb) ||
+            jsonb_build_object(
+              'telegramDelivered',$2::boolean,
+              'telegramNotifiedAt',now()
+            ),
+          updated_at=now()
+      where id=$1::uuid
+      `,
+      [payout.id, telegram],
+    );
+
     return {
       success: true,
       data: {
@@ -573,6 +714,7 @@ export class ClientService {
         currency: "BRL",
         status: payout.status,
         destination: { type: pixKeyType, masked: maskedKey },
+        idempotentReplay: false,
         ticket: {
           channel: "TELEGRAM_MANUAL",
           notificationDelivered: telegram,
