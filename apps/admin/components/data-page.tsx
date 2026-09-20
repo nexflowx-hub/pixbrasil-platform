@@ -125,8 +125,8 @@ function RoutingView({ payload, loading }: { payload: RoutingPayload | null; loa
           gold
         />
         <Metric
-          label="Pilot live"
-          value={payload?.featureFlags.find((flag) => flag.key === "pilot_live_execution")?.enabled ? "ON" : "OFF"}
+          label="Live payments"
+          value={payload?.featureFlags.find((flag) => flag.key === "live_payment_execution")?.enabled ? "ON" : "OFF"}
           icon={ShieldCheck}
           gold
         />
