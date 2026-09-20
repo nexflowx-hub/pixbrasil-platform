@@ -89,6 +89,20 @@ export class ClientService {
       );
     }
 
+    const payoutFlag = await this.database.query<{ enabled: boolean }>(
+      `
+      select enabled
+      from controlplane.feature_flags
+      where key='manual_payouts'
+      limit 1
+      `,
+    );
+    if (!payoutFlag.rows[0]?.enabled) {
+      throw new ForbiddenException(
+        "Manual payout tickets are not enabled for production.",
+      );
+    }
+
     const amount = Math.round(Number(input.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException("amount must be a positive number.");
@@ -541,7 +555,11 @@ export class ClientService {
             `
             select key,enabled
             from controlplane.feature_flags
-            where key in ('routing_enforcement','live_payment_execution')
+            where key in (
+              'routing_enforcement',
+              'live_payment_execution',
+              'manual_payouts'
+            )
             `,
           ),
         ]);
@@ -554,6 +572,9 @@ export class ClientService {
         );
         const liveEnabled = Boolean(
           flags.rows.find((flag) => flag.key === "live_payment_execution")?.enabled,
+        );
+        const manualPayoutsEnabled = Boolean(
+          flags.rows.find((flag) => flag.key === "manual_payouts")?.enabled,
         );
 
         const paymentRows = payments.rows as Array<Record<string, unknown>>;
@@ -568,7 +589,7 @@ export class ClientService {
         capabilities = {
           financialWritesEnabled: routingEnabled && liveEnabled && complianceReady,
           pixCollectionEnabled: routingEnabled && liveEnabled && complianceReady,
-          payoutTicketsEnabled: complianceReady,
+          payoutTicketsEnabled: complianceReady && manualPayoutsEnabled,
           exchangeEnabled: false,
           note:
             "PIX collections operate through configured Stores. Payouts are processed by manual treasury ticket.",
