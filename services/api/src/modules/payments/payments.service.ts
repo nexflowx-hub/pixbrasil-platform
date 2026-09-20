@@ -881,10 +881,14 @@ export class PaymentsService {
       if (!action) {
         await this.database.query(
           `
-          update pixbrasil.provider_attempts
-          set status='AMBIGUOUS',ambiguous=true,error_category='INCOMPLETE_PROVIDER_RESPONSE',
-              completed_at=now()
-          where id=$1::uuid;
+          with updated_attempt as (
+            update pixbrasil.provider_attempts
+            set status='AMBIGUOUS',ambiguous=true,
+                error_category='INCOMPLETE_PROVIDER_RESPONSE',
+                completed_at=now()
+            where id=$1::uuid
+            returning id
+          )
           update pixbrasil.payment_intents
           set status='RECONCILIATION_REQUIRED',updated_at=now()
           where id=$2::uuid
@@ -904,16 +908,18 @@ export class PaymentsService {
 
       await this.database.query(
         `
-        update pixbrasil.provider_attempts
-        set status=$2::text,
-            provider_payment_id=$3::text,
-            response_metadata=jsonb_build_object(
-              'action',$4::jsonb,
-              'recovered',$5::boolean
-            ),
-            completed_at=now()
-        where id=$1::uuid;
-
+        with updated_attempt as (
+          update pixbrasil.provider_attempts
+          set status=$2::text,
+              provider_payment_id=$3::text,
+              response_metadata=jsonb_build_object(
+                'action',$4::jsonb,
+                'recovered',$5::boolean
+              ),
+              completed_at=now()
+          where id=$1::uuid
+          returning id
+        )
         update pixbrasil.payment_intents
         set status='PENDING_PAYMENT',
             metadata=metadata || jsonb_build_object(
@@ -965,10 +971,15 @@ export class PaymentsService {
     if (execution.kind === "FINAL_REJECTION") {
       await this.database.query(
         `
-        update pixbrasil.provider_attempts
-        set status='REJECTED',error_category=$2::text,retriable=false,completed_at=now()
-        where id=$1::uuid;
-        update pixbrasil.payment_intents set status='FAILED',updated_at=now()
+        with updated_attempt as (
+          update pixbrasil.provider_attempts
+          set status='REJECTED',error_category=$2::text,
+              retriable=false,completed_at=now()
+          where id=$1::uuid
+          returning id
+        )
+        update pixbrasil.payment_intents
+        set status='FAILED',updated_at=now()
         where id=$3::uuid
         `,
         [
@@ -987,10 +998,15 @@ export class PaymentsService {
     if (execution.kind === "SAFE_FAILOVER_ALLOWED") {
       await this.database.query(
         `
-        update pixbrasil.provider_attempts
-        set status='UNAVAILABLE',error_category=$2::text,retriable=true,completed_at=now()
-        where id=$1::uuid;
-        update pixbrasil.payment_intents set status='FAILED',updated_at=now()
+        with updated_attempt as (
+          update pixbrasil.provider_attempts
+          set status='UNAVAILABLE',error_category=$2::text,
+              retriable=true,completed_at=now()
+          where id=$1::uuid
+          returning id
+        )
+        update pixbrasil.payment_intents
+        set status='FAILED',updated_at=now()
         where id=$3::uuid
         `,
         [attempt.rows[0].id, execution.reason, paymentIntentId],
@@ -1003,9 +1019,13 @@ export class PaymentsService {
 
     await this.database.query(
       `
-      update pixbrasil.provider_attempts
-      set status='AMBIGUOUS',ambiguous=true,error_category=$2::text,completed_at=now()
-      where id=$1::uuid;
+      with updated_attempt as (
+        update pixbrasil.provider_attempts
+        set status='AMBIGUOUS',ambiguous=true,
+            error_category=$2::text,completed_at=now()
+        where id=$1::uuid
+        returning id
+      )
       update pixbrasil.payment_intents
       set status='RECONCILIATION_REQUIRED',updated_at=now()
       where id=$3::uuid
