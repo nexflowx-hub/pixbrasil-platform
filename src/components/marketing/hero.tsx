@@ -87,7 +87,7 @@ export function HeroSection() {
             className="anim-hero-text text-[10.5px] font-bold uppercase tracking-[0.3em] text-aqua sm:text-[11px]"
             style={{ animationDelay: "0.05s" }}
           >
-            MVP privado · infraestrutura financeira em validação
+            INFRAESTRUTURA FINANCEIRA · PRODUÇÃO
           </p>
 
           <h1 className="mt-4 text-[42px] font-bold leading-[0.99] tracking-[-0.035em] text-cream sm:text-[44px] lg:text-[42px] xl:text-[50px] 2xl:text-[52px] 3xl:text-[54px]">
