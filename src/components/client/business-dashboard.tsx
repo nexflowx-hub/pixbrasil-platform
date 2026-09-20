@@ -28,7 +28,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 import type {
   AccountAccess,
@@ -943,11 +943,10 @@ function CashflowChart({
     outgoing: Number(row.outgoing_brl),
   }));
   const max = Math.max(1, ...values.flatMap((row) => [row.incoming, row.outgoing]));
-  let cumulative = 0;
-  const cumulativePoints = values.map((row) => {
-    cumulative += row.incoming - row.outgoing;
-    return cumulative;
-  });
+  const cumulativePoints = values.reduce<number[]>((points, row) => {
+    const previous = points.at(-1) ?? 0;
+    return [...points, previous + row.incoming - row.outgoing];
+  }, []);
   const maxCum = Math.max(1, ...cumulativePoints.map((value) => Math.abs(value)));
 
   if (!rows.length) return <EmptyState text="Sem dados de fluxo ainda." />;
