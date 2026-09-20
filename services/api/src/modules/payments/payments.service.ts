@@ -73,7 +73,7 @@ interface FeeRuleRow {
   fixed_fee_brl: string;
 }
 
-interface ReleaseRuleRow {
+export interface ReleaseRuleRow {
   rail: string;
   asset_code: string | null;
   network_code: string | null;
