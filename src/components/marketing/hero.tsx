@@ -126,10 +126,10 @@ export function HeroSection() {
             style={{ animationDelay: "0.52s" }}
           >
             <Link
-              href="/business"
+              href="/early-access"
               className="btn-cta group flex h-[46px] items-center justify-center gap-2.5 whitespace-nowrap rounded-full px-7 text-[14.5px] font-bold"
             >
-              Começar com PiXBrasil
+              Solicitar acesso
               <ArrowRight
                 className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
                 aria-hidden="true"
