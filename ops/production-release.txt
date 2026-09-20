@@ -1,3 +1,3 @@
 PiXBrasil production release
-base=8387243917d42384d340c651eca34bb80d118c93
-release=prod-financial-runtime-v0.6+business-dashboard
+base=4e83803619e20f0224d2d79ae0b70cf908d0b302
+release=v0.6-live-routing-business-dashboard-manual-payouts
