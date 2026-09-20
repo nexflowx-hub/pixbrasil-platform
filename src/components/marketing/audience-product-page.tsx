@@ -21,7 +21,7 @@ type Audience = "personal" | "business";
 const content = {
   personal: {
     eyebrow: "PIXBRASIL PERSONAL",
-    title: "Visibilidade primeiro. Movimentação quando o rail estiver pronto.",
+    title: "Sua conta financeira, com estados claros por ativo e operação.",
     description:
       "O Client Portal reúne conta, KYC, wallets e atividade numa interface única. As capacidades disponíveis são apresentadas de forma explícita por produto, ativo e rail.",
     icon: UserRound,
@@ -147,8 +147,8 @@ export function AudienceProductPage({ audience }: { audience: Audience }) {
 }
 
 function StatusBadge({ value }: { value: string }) {
-  const available = value === "AVAILABLE";
-  const validating = value === "MANUAL" || value === "PRODUCTION";
+  const available = value === "AVAILABLE" || value === "PRODUCTION";
+  const validating = value === "MANUAL";
   const Icon = available ? CheckCircle2 : validating ? Clock3 : CircleDashed;
   return (
     <span className={[
