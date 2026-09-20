@@ -8,6 +8,8 @@ import {
 import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import type { MerchantApiContext } from "../merchant-auth/merchant-auth.types";
+import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
+import { executeProviderAttempt } from "./provider-execution";
 import { RoutingEngineService } from "../routing/routing-engine.service";
 import type {
   RouteCandidate,
@@ -144,11 +146,55 @@ function normalizeMetadata(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function normalizePixAction(providerCode: string, payload: unknown) {
+  const root = asRecord(payload);
+  const data = asRecord(root.data);
+  const transaction = asRecord(root.transaction);
+  const provider = providerCode.toUpperCase();
+
+  const copyPaste = String(
+    provider === "MISTICPAY"
+      ? data.copyPaste ?? root.copyPaste ?? transaction.copyPaste ?? ""
+      : data.qr_code ?? data.copyPaste ?? root.qr_code ?? root.copyPaste ?? "",
+  ).trim();
+
+  const qrCode = String(
+    data.qr_image ??
+      data.qrCode ??
+      data.qr_code_base64 ??
+      root.qr_image ??
+      root.qrCode ??
+      "",
+  ).trim();
+
+  const expiresAt = String(
+    data.expires_at ??
+      data.expiration ??
+      root.expires_at ??
+      root.expiration ??
+      "",
+  ).trim();
+
+  return {
+    type: "PIX",
+    copyPaste: copyPaste || null,
+    qrCode: qrCode || null,
+    expiresAt: expiresAt || null,
+  };
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly routing: RoutingEngineService,
+    private readonly providers: ProviderAdapterRegistry,
   ) {}
 
   async getPayment(
