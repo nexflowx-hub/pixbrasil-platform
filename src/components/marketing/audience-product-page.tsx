@@ -21,16 +21,16 @@ type Audience = "personal" | "business";
 const content = {
   personal: {
     eyebrow: "PIXBRASIL PERSONAL",
-    title: "Visibilidade primeiro. Movimentação quando o rail estiver pronto.",
+    title: "Conta digital com visão clara de saldos, ativos e atividade.",
     description:
-      "O Client Portal reúne conta, KYC, wallets e atividade numa interface única. No MVP, a experiência é read-only para contas convidadas enquanto recebimentos, câmbio e withdrawals concluem validação operacional.",
+      "O Client Portal reúne conta, KYC, wallets e atividade numa interface única. As capacidades disponíveis seguem a política e o estado de verificação de cada conta.",
     icon: UserRound,
     capabilities: [
       ["Client Portal autenticado", "AVAILABLE", "Sessão HttpOnly e account overview real."],
       ["Wallets multiativos", "AVAILABLE", "Saldos por ativo e rede, sem conversão fictícia."],
-      ["Receber via PIX", "VALIDATING", "Rail financeiro ainda bloqueado para contas Personal."],
-      ["Enviar / Withdraw", "VALIDATING", "Disponível somente após payout e settlement guardrails."],
-      ["Conversão", "PLANNED", "Sem FX sintético no MVP."],
+      ["Receber via PIX", "POLICY", "Disponibilidade conforme perfil, KYC e política da conta."],
+      ["Enviar / Withdraw", "POLICY", "Disponibilidade conforme perfil, saldo e política da conta."],
+      ["Conversão", "ROADMAP", "Ativos e redes são ativados progressivamente por produto."],
     ],
     highlights: [
       [WalletCards, "Wallets transparentes", "Disponível, pending, reserved e blocked separados por ativo."],
@@ -42,14 +42,14 @@ const content = {
     eyebrow: "PIXBRASIL BUSINESS",
     title: "Uma camada de controle para PIX, Stores e routing.",
     description:
-      "Empresas visualizam Stores, provider selecionado, classe de liberação e PaymentIntents no mesmo portal. A API S2S está disponível no piloto SHADOW; execução PIX live continua protegida por kill-switch.",
+      "Empresas operam Stores, provider, routing, liberações e PaymentIntents no mesmo portal. A API PIX S2S cria cobranças reais nas rotas de produção configuradas para cada Store.",
     icon: Building2,
     capabilities: [
       ["Client Portal Business", "AVAILABLE", "Account switch e visão merchant/store real."],
       ["Stores e routing", "AVAILABLE", "Provider, gateway, D0/D1 e release profile por Store."],
-      ["API PIX S2S", "SHADOW", "PaymentIntent e routing decision sem movimentar fundos."],
-      ["PIX live", "VALIDATING", "Aguardando create → webhook → settlement validado."],
-      ["Payouts", "VALIDATING", "Manual/automatic payout permanecem feature-flagged."],
+      ["API PIX S2S", "PRODUCTION", "Cobrança PIX real com idempotência e provider routing."],
+      ["PIX live", "PRODUCTION", "Create → webhook verificado → settlement → Wallet BRL."],
+      ["Payouts", "MANUAL", "Tickets operacionais com reserva de saldo; automação vem a seguir."],
     ],
     highlights: [
       [Store, "Store-scoped", "Cada operação pode ter provider, custos e release diferentes."],
@@ -94,7 +94,7 @@ export function AudienceProductPage({ audience }: { audience: Audience }) {
             <div className="flex items-center justify-between border-b border-white/7 pb-4">
               <div>
                 <span className="text-[9px] uppercase tracking-[.14em] text-[#607970]">Capability matrix</span>
-                <strong className="mt-1 block text-[14px]">Estado do MVP</strong>
+                <strong className="mt-1 block text-[14px]">Estado operacional</strong>
               </div>
               <ShieldCheck className="h-5 w-5 text-[#20F29A]" />
             </div>
@@ -132,7 +132,7 @@ export function AudienceProductPage({ audience }: { audience: Audience }) {
               <span className="text-[9px] font-bold uppercase tracking-[.14em] text-[#C7A95A]">TRANSPARÊNCIA OPERACIONAL</span>
               <h2 className="mt-2 text-2xl font-semibold tracking-[-.04em]">Nenhuma feature é chamada de “ativa” antes de estar operacional.</h2>
               <p className="mt-3 max-w-3xl text-[10px] leading-5 text-[#8D826A]">
-                O PiXBrasil distingue interface disponível, rail em SHADOW, capacidade em validação e função planejada. Isso também aparece no portal e no Control Plane.
+                O PiXBrasil apresenta o estado real de cada capacidade, provider, Store e política financeira no Portal e no Control Plane.
               </p>
             </div>
             <Link href="/how-it-works" className="mt-5 inline-flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[#D2A34E] sm:mt-0">
