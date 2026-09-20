@@ -886,6 +886,7 @@ export class PaymentsService {
       values(
         $1::uuid,$2::uuid,$3::uuid,1,'STARTED',$4::text,$5::text,'{}'::jsonb,now()
       )
+      on conflict (payment_intent_id,attempt_no) do nothing
       returning id
       `,
       [
@@ -896,6 +897,10 @@ export class PaymentsService {
         requestFingerprint,
       ],
     );
+
+    if (!attempt.rows[0]) {
+      return this.loadChargeResult(paymentIntentId, true);
+    }
 
     const providerCode = connectionRow.provider_code.toUpperCase();
     const adapter = this.providers.get(providerCode);
