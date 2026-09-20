@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bot, Braces, CheckCircle2, Clock3, KeyRound, RadioTower, Store, Webhook } from "lucide-react";
+import { ArrowRight, Bot, Braces, CheckCircle2, CheckCircle2, KeyRound, RadioTower, Store, Webhook } from "lucide-react";
 import { DocsCard, DocsGrid, DocsSection, DocsShell } from "@/components/docs/docs-shell";
 import { CopyBlock, InlineCode } from "@/components/docs/copy-block";
 
@@ -31,7 +31,7 @@ export default function DocsHomePage() {
             <p className="mt-2">Endpoints HTTPS assinados com HMAC-SHA256 e signing secret em Vault.</p>
           </DocsCard>
           <DocsCard title="Provider execution" tone="gold">
-            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> SHADOW / piloto controlado</div>
+            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> PRODUÇÃO / routing por Store</div>
             <p className="mt-2">A Store só cria PIX real quando o modo de execução for explicitamente ativado.</p>
           </DocsCard>
           <DocsCard title="Payouts & settlement" tone="gold">
