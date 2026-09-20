@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
+import { FinancialCoreService } from "../financial/financial-core.service";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
 import type { NormalizedProviderStatus } from "../providers/provider-adapter";
 import { MerchantWebhooksService } from "../merchant-webhooks/merchant-webhooks.service";
@@ -28,6 +29,7 @@ export class WebhooksService {
     private readonly database: DatabaseService,
     private readonly providers: ProviderAdapterRegistry,
     private readonly merchantWebhooks: MerchantWebhooksService,
+    private readonly financial: FinancialCoreService,
   ) {}
 
   async handleMisticPay(
@@ -99,6 +101,14 @@ export class WebhooksService {
     );
 
     if (payment && !persisted.replay) {
+      if (payment.status === "SUCCEEDED") {
+        await this.financial.recordSuccessfulPayment({
+          paymentIntentId: payment.paymentIntentId,
+          providerPaymentId: payment.providerPaymentId,
+          providerCode: payment.providerCode,
+        });
+      }
+
       await this.merchantWebhooks.deliverPaymentEvent(
         this.toMerchantEventType(payment.status),
         payment,
