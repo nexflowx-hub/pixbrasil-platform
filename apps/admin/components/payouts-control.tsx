@@ -43,7 +43,6 @@ export function PayoutsControl() {
   const [message, setMessage] = useState("");
 
   const load = useCallback(async () => {
-    setLoading(true);
     try {
       const response = await adminFetch<{ success: true; data: PayoutRow[] }>(
         "/api/v1/admin/payouts",
@@ -133,7 +132,10 @@ export function PayoutsControl() {
             Tickets manuais, saldo reservado, comprovativos e confirmação operacional.
           </p>
         </div>
-        <button className="secondary-button" onClick={() => void load()} disabled={loading}>
+        <button className="secondary-button" onClick={() => {
+          setLoading(true);
+          void load();
+        }} disabled={loading}>
           {loading ? <LoaderCircle className="spin" size={15} /> : <RefreshCw size={15} />}
           Atualizar
         </button>
