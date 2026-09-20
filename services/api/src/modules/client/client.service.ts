@@ -80,6 +80,14 @@ export class ClientService {
         "This account role cannot request payouts.",
       );
     }
+    if (
+      access.accountStatus !== "ACTIVE" ||
+      access.kycStatus !== "APPROVED"
+    ) {
+      throw new ForbiddenException(
+        "Active account with approved KYC is required for payouts.",
+      );
+    }
 
     const amount = Math.round(Number(input.amount) * 100) / 100;
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -554,10 +562,13 @@ export class ClientService {
           (row) => row.status === "SUCCEEDED",
         ).length;
 
+        const complianceReady =
+          account.status === "ACTIVE" && account.kyc_status === "APPROVED";
+
         capabilities = {
-          financialWritesEnabled: routingEnabled && liveEnabled,
-          pixCollectionEnabled: routingEnabled && liveEnabled,
-          payoutTicketsEnabled: true,
+          financialWritesEnabled: routingEnabled && liveEnabled && complianceReady,
+          pixCollectionEnabled: routingEnabled && liveEnabled && complianceReady,
+          payoutTicketsEnabled: complianceReady,
           exchangeEnabled: false,
           note:
             "PIX collections operate through configured Stores. Payouts are processed by manual treasury ticket.",
