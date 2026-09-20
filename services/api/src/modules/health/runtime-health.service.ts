@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { APP_VERSION } from "../../config/build-info";
 import { DatabaseService } from "../database/database.service";
 import { RedisService } from "../redis/redis.service";
 
@@ -19,7 +20,7 @@ export class RuntimeHealthService {
       success: ready,
       service: "PiXBrasil",
       component: "api",
-      version: process.env.APP_VERSION ?? "0.5.0",
+      version: APP_VERSION,
       status: ready ? "READY" : "NOT_READY",
       database,
       redis,
