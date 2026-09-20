@@ -13,11 +13,15 @@ import { AdminAuthGuard } from "../auth/admin-auth.guard";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { RequirePermissions } from "../auth/permissions.decorator";
 import { AdminService } from "./admin.service";
+import { FinancialCoreService } from "../finance/financial-core.service";
 
 @Controller("v1/admin")
 @UseGuards(AdminAuthGuard, PermissionsGuard)
 export class AdminController {
-  constructor(private readonly admin: AdminService) {}
+  constructor(
+    private readonly admin: AdminService,
+    private readonly financialCore: FinancialCoreService,
+  ) {}
 
   @Get("session")
   session(@Req() request: AdminRequest) {
@@ -143,6 +147,37 @@ export class AdminController {
   @RequirePermissions("payouts.read")
   payouts() {
     return this.admin.payoutsOverview();
+  }
+
+  @Post("payouts/:payoutId/confirm")
+  @RequirePermissions("payouts.confirm")
+  confirmPayout(
+    @Param("payoutId") payoutId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AdminRequest,
+  ) {
+    return this.financialCore.confirmManualPayout(
+      payoutId,
+      request.adminContext!.authUserId,
+      {
+        externalReference: body.externalReference,
+        proof: body.proof,
+      },
+    );
+  }
+
+  @Post("payouts/:payoutId/reject")
+  @RequirePermissions("payouts.confirm")
+  rejectPayout(
+    @Param("payoutId") payoutId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AdminRequest,
+  ) {
+    return this.financialCore.rejectManualPayout(
+      payoutId,
+      request.adminContext!.authUserId,
+      body.reason,
+    );
   }
 
   @Get("users")

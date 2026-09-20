@@ -4,11 +4,14 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import type { MerchantApiContext } from "../merchant-auth/merchant-auth.types";
 import { RoutingEngineService } from "../routing/routing-engine.service";
+import { PaymentLiveExecutionService } from "./payment-live-execution.service";
 import type {
   RouteCandidate,
   RoutingStrategy,
@@ -149,6 +152,7 @@ export class PaymentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly routing: RoutingEngineService,
+    private readonly liveExecution: PaymentLiveExecutionService,
   ) {}
 
   async getPayment(
@@ -250,7 +254,11 @@ export class PaymentsService {
               ambiguous: Boolean(row.ambiguous),
             }
           : null,
-        economics: row.metadata?.shadowQuote ?? null,
+        action: row.metadata?.providerAction ?? null,
+        economics:
+          row.metadata?.productionQuote ??
+          row.metadata?.shadowQuote ??
+          null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         completedAt: row.completed_at,
@@ -258,7 +266,7 @@ export class PaymentsService {
     };
   }
 
-  async createShadowCharge(
+  async createCharge(
     merchant: MerchantApiContext,
     idempotencyKeyValue: string | undefined,
     input: ChargeInput,
@@ -386,7 +394,7 @@ export class PaymentsService {
           "Idempotency-Key was already used with a different payment payload.",
         );
       }
-      return this.loadShadowResult(existing.rows[0].id, true);
+      return this.loadPaymentResult(existing.rows[0].id, true);
     }
 
     const routeCostRule = await this.database.query<FeeRuleRow>(
@@ -526,7 +534,7 @@ export class PaymentsService {
       if (!duplicate.rows[0]) {
         throw new ConflictException("Unable to resolve idempotent payment.");
       }
-      return this.loadShadowResult(duplicate.rows[0].id, true);
+      return this.loadPaymentResult(duplicate.rows[0].id, true);
     }
 
     const paymentIntentId = inserted.rows[0].id;
@@ -603,7 +611,17 @@ export class PaymentsService {
           (row) => row.connection_id === selected.connectionId,
         )
       : undefined;
-    const outcome = selected ? "SHADOW_ONLY" : "NO_ROUTE";
+    const routingFlag = await this.database.query<{ enabled: boolean }>(
+      `select enabled from controlplane.feature_flags where key='routing_enforcement' limit 1`,
+    );
+    const liveExecution =
+      Boolean(routingFlag.rows[0]?.enabled) &&
+      config.activation_mode === "ENFORCED";
+    const outcome = selected
+      ? liveExecution
+        ? "SELECTED"
+        : "SHADOW_ONLY"
+      : "NO_ROUTE";
 
     const decision = await this.database.query<{ id: string }>(
       `
@@ -635,7 +653,7 @@ export class PaymentsService {
         ),
         JSON.stringify(draft.rejected),
         JSON.stringify({
-          mode: "SHADOW",
+          mode: liveExecution ? "LIVE" : "SHADOW",
           routeCostProfile: config.route_cost_profile_code,
           releaseProfile: config.release_profile_code,
           releaseClass: config.release_class,
@@ -659,13 +677,13 @@ export class PaymentsService {
       `
       update pixbrasil.payment_intents
       set selected_connection_id=$2::uuid,
-          status='CREATED',
+          status=case when $2::uuid is null then 'FAILED' else 'CREATED' end,
           metadata=metadata || jsonb_build_object(
-            'routingMode','SHADOW',
-            'routingDecisionId',$3::text,
-            'shadowQuote',$4::jsonb,
-            'releaseProfile',$5::text,
-            'releaseClass',$6::text
+            'routingMode',$3::text,
+            'routingDecisionId',$4::text,
+            'productionQuote',$5::jsonb,
+            'releaseProfile',$6::text,
+            'releaseClass',$7::text
           ),
           updated_at=now()
       where id=$1::uuid
@@ -673,12 +691,55 @@ export class PaymentsService {
       [
         paymentIntentId,
         selected?.connectionId ?? null,
+        liveExecution ? "LIVE" : "SHADOW",
         decision.rows[0]?.id ?? null,
         JSON.stringify(quote),
         config.release_profile_code,
         config.release_class,
       ],
     );
+
+    if (!selected || !selectedRow) {
+      return this.loadPaymentResult(paymentIntentId, false);
+    }
+
+    if (liveExecution) {
+      return this.liveExecution.execute({
+        paymentIntentId,
+        routingDecisionId: decision.rows[0]?.id ?? null,
+        connectionId: selected.connectionId,
+        providerCode: selectedRow.provider_code,
+        gatewayAlias: selectedRow.gateway_alias,
+        requestFingerprint,
+        reference,
+        amount: normalizedAmount,
+        description: String(input.description ?? "").slice(0, 200),
+        payer: {
+          name: payerName,
+          taxId: payerTaxId,
+          ...(String(input.payer?.email ?? "").trim()
+            ? { email: String(input.payer?.email).trim().slice(0, 255) }
+            : {}),
+          ...(String(input.payer?.phone ?? "").trim()
+            ? { phone: String(input.payer?.phone).trim().slice(0, 32) }
+            : {}),
+        },
+        store: {
+          code: config.store_code,
+          name: config.store_name,
+        },
+        routing: {
+          policy: config.policy_name,
+          policyVersion: config.policy_version,
+          releaseClass: config.release_class,
+        },
+        economics: quote,
+        release: {
+          profile: config.release_profile_code,
+          rules: releaseRules.rows,
+        },
+      });
+    }
 
     return {
       success: true,
@@ -697,8 +758,8 @@ export class PaymentsService {
           mode: "SHADOW",
           policy: config.policy_name,
           policyVersion: config.policy_version,
-          providerCode: selectedRow?.provider_code ?? null,
-          gatewayAlias: selectedRow?.gateway_alias ?? null,
+          providerCode: selectedRow.provider_code,
+          gatewayAlias: selectedRow.gateway_alias,
           releaseClass: config.release_class,
           crossReleaseClassFailover: false,
         },
@@ -711,7 +772,7 @@ export class PaymentsService {
     };
   }
 
-  private async loadShadowResult(
+  private async loadPaymentResult(
     paymentIntentId: string,
     idempotentReplay: boolean,
   ) {
@@ -728,6 +789,8 @@ export class PaymentsService {
       provider_code: string | null;
       gateway_alias: string | null;
       outcome: string | null;
+      provider_payment_id: string | null;
+      provider_attempt_status: string | null;
     }>(
       `
       select
@@ -742,7 +805,9 @@ export class PaymentsService {
         rp.name as policy_name,
         p.code as provider_code,
         gc.alias as gateway_alias,
-        rd.outcome
+        rd.outcome,
+        pa.provider_payment_id,
+        pa.status as provider_attempt_status
       from pixbrasil.payment_intents pi
       left join pixbrasil.stores s on s.id=pi.store_id
       left join lateral (
@@ -752,8 +817,16 @@ export class PaymentsService {
         order by rd0.created_at desc
         limit 1
       ) rd on true
+      left join lateral (
+        select *
+        from pixbrasil.provider_attempts pa0
+        where pa0.payment_intent_id=pi.id
+        order by pa0.attempt_no desc
+        limit 1
+      ) pa on true
       left join pixbrasil.routing_policies rp on rp.id=rd.policy_id
-      left join pixbrasil.gateway_connections gc on gc.id=rd.selected_connection_id
+      left join pixbrasil.gateway_connections gc
+        on gc.id=coalesce(pa.gateway_connection_id,rd.selected_connection_id)
       left join public.providers p on p.id=gc.provider_id
       where pi.id=$1::uuid
       `,
@@ -768,7 +841,10 @@ export class PaymentsService {
       data: {
         paymentIntentId: row.id,
         idempotentReplay,
-        status: row.outcome ?? row.status,
+        status:
+          row.status === "CREATED" && row.outcome === "SHADOW_ONLY"
+            ? "SHADOW_ONLY"
+            : row.status,
         amount: Number(row.amount),
         currency: row.currency,
         reference: row.external_reference,
@@ -783,7 +859,17 @@ export class PaymentsService {
           gatewayAlias: row.gateway_alias,
           releaseClass: row.metadata?.releaseClass ?? null,
         },
-        economics: row.metadata?.shadowQuote ?? null,
+        provider: row.provider_payment_id
+          ? {
+              paymentId: row.provider_payment_id,
+              attemptStatus: row.provider_attempt_status,
+            }
+          : null,
+        action: row.metadata?.providerAction ?? null,
+        economics:
+          row.metadata?.productionQuote ??
+          row.metadata?.shadowQuote ??
+          null,
       },
     };
   }

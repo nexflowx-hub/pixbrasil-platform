@@ -60,7 +60,7 @@ const definitions = {
     endpoint: "/api/v1/admin/ledger",
     eyebrow: "FINANCIAL CORE",
     title: "Ledger & Balances",
-    description: "Ledger imutável e saldos materializados, em modo read-only.",
+    description: "Ledger imutável, saldos materializados e evidência contabilística.",
     icon: Database,
     sections: [
       { key: "transactions", title: "Ledger transactions", columns: ["reference","type","status","external_reference","entry_count","created_at","posted_at"] },
@@ -79,7 +79,7 @@ const definitions = {
     endpoint: "/api/v1/admin/payouts",
     eyebrow: "TREASURY",
     title: "Payouts",
-    description: "Pedidos e evidência de payout. Escrita permanece feature-flagged.",
+    description: "Fila operacional de payouts manuais com confirmação e prova.",
     icon: CircleDollarSign,
     sections: [{ key: "root", title: "Payout queue", columns: ["account_type","asset_code","amount","destination_type","status","external_reference","approval_request_id","created_at","confirmed_at"] }],
   },
@@ -202,8 +202,8 @@ export function OperationalPage({ kind }: { kind: Kind }) {
         </article>
         <article className="metric-card tone-gold">
           <div className="metric-top"><span>Writes</span><FileClock size={17} /></div>
-          <strong>GUARDED</strong>
-          <p>feature flags + approvals</p>
+          <strong>CONTROLLED</strong>
+          <p>RBAC + approvals</p>
           <div className="metric-line" />
         </article>
       </section>
@@ -226,7 +226,19 @@ export function OperationalPage({ kind }: { kind: Kind }) {
               </div>
               <Icon size={17} />
             </div>
-            <OperationalTable rows={rows} columns={[...section.columns]} loading={loading} />
+            {kind === "payouts" && section.key === "root" ? (
+              <PayoutOperations
+                rows={rows}
+                loading={loading}
+                onChanged={() => setRefresh((value) => value + 1)}
+              />
+            ) : (
+              <OperationalTable
+                rows={rows}
+                columns={[...section.columns]}
+                loading={loading}
+              />
+            )}
           </section>
         );
       })}
@@ -234,7 +246,7 @@ export function OperationalPage({ kind }: { kind: Kind }) {
       {kind === "risk" ? (
         <div className="warning-banner">
           <ShieldCheck size={17} />
-          Risk scoring transacional dedicado ainda não está ativo. O painel mostra apenas postura factual do MVP.
+          Risk scoring transacional dedicado ainda não está ativo. O painel mostra a postura factual da operação.
         </div>
       ) : null}
     </div>
@@ -278,6 +290,124 @@ function OperationalTable({
               ))}
             </tr>
           ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PayoutOperations({
+  rows,
+  loading,
+  onChanged,
+}: {
+  rows: Record<string, unknown>[];
+  loading: boolean;
+  onChanged: () => void;
+}) {
+  const [busyId, setBusyId] = useState("");
+
+  if (loading) {
+    return <div className="empty-state"><LoaderCircle className="spin" size={16} /> A carregar payouts…</div>;
+  }
+  if (!rows.length) {
+    return <div className="empty-state">Nenhum payout solicitado.</div>;
+  }
+
+  async function confirm(row: Record<string, unknown>) {
+    const payoutId = String(row.id ?? "");
+    const reference = window.prompt(
+      "Referência externa/comprovativo do payout:",
+      String(row.external_reference ?? ""),
+    );
+    if (reference === null) return;
+
+    setBusyId(payoutId);
+    try {
+      await adminFetch(`/api/v1/admin/payouts/${payoutId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          externalReference: reference,
+          proof: { source: "ADMIN_CONTROL_PLANE" },
+        }),
+      });
+      onChanged();
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function reject(row: Record<string, unknown>) {
+    const payoutId = String(row.id ?? "");
+    const reason = window.prompt("Motivo da rejeição:");
+    if (!reason) return;
+
+    setBusyId(payoutId);
+    try {
+      await adminFetch(`/api/v1/admin/payouts/${payoutId}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      onChanged();
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  return (
+    <div className="table-shell">
+      <table>
+        <thead>
+          <tr>
+            <th>Criado</th>
+            <th>Conta</th>
+            <th>Ativo</th>
+            <th>Valor</th>
+            <th>Status</th>
+            <th>Referência</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const payoutId = String(row.id ?? index);
+            const status = String(row.status ?? "");
+            const actionable = ["DRAFT","APPROVAL_REQUIRED","APPROVED","PROCESSING","PAID"].includes(status);
+            return (
+              <tr key={payoutId}>
+                <td>{renderValue(row.created_at, "created_at")}</td>
+                <td>{String(row.account_type ?? "—")}</td>
+                <td>{String(row.asset_code ?? "—")}</td>
+                <td>{String(row.amount ?? "—")}</td>
+                <td>{renderValue(status, "status")}</td>
+                <td>{String(row.external_reference ?? "—")}</td>
+                <td>
+                  {actionable ? (
+                    <div className="inline-actions">
+                      <button
+                        className="primary-button compact-action"
+                        disabled={busyId === payoutId}
+                        onClick={() => void confirm(row)}
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        className="danger-button compact-action"
+                        disabled={busyId === payoutId}
+                        onClick={() => void reject(row)}
+                      >
+                        Rejeitar
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="muted-value">Finalizado</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

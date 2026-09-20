@@ -20,7 +20,7 @@ export default function DocsHomePage() {
       title="Integre PIX sem transformar o seu site num projeto financeiro."
       description="O PiXBrasil separa Store, routing, provider, liberação e credenciais. Esta documentação mostra o fluxo mínimo e seguro para integrar um site, e-commerce, SaaS ou funnel ao Core."
     >
-      <DocsSection id="status" title="Estado atual da plataforma" description="A documentação distingue capacidade disponível de execução financeira ainda em validação.">
+      <DocsSection id="status" title="Estado atual da plataforma" description="A documentação reflete a operação de produção: cobrança PIX, status, webhooks, settlement e Wallet BRL.">
         <DocsGrid>
           <DocsCard title="API S2S" tone="green">
             <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Disponível</div>
@@ -31,7 +31,7 @@ export default function DocsHomePage() {
             <p className="mt-2">Endpoints HTTPS assinados com HMAC-SHA256 e signing secret em Vault.</p>
           </DocsCard>
           <DocsCard title="Provider execution" tone="gold">
-            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> SHADOW / piloto controlado</div>
+            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> LIVE / produção controlado</div>
             <p className="mt-2">A Store só cria PIX real quando o modo de execução for explicitamente ativado.</p>
           </DocsCard>
           <DocsCard title="Payouts & settlement" tone="gold">

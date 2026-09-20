@@ -1,7 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
+  Headers,
   Param,
+  Post,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -17,6 +20,21 @@ export class ClientController {
   @Get("session")
   session(@Req() request: ClientRequest) {
     return this.client.session(request.clientContext!);
+  }
+
+  @Post("accounts/:accountId/payouts")
+  payout(
+    @Param("accountId") accountId: string,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: Record<string, unknown>,
+    @Req() request: ClientRequest,
+  ) {
+    return this.client.requestPayout(
+      request.clientContext!,
+      accountId,
+      idempotencyKey,
+      body,
+    );
   }
 
   @Get("accounts/:accountId/overview")
