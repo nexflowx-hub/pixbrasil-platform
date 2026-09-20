@@ -1021,6 +1021,172 @@ export class AdminService {
     return { success: true, data: result.rows };
   }
 
+  async updatePayoutStatus(
+    payoutId: string,
+    input: Record<string, unknown>,
+    admin: AdminContext,
+  ) {
+    const target = String(input.status ?? "").trim().toUpperCase();
+    const allowed = new Set([
+      "PROCESSING",
+      "PAID",
+      "CONFIRMED",
+      "REJECTED",
+      "CANCELED",
+      "FAILED",
+    ]);
+    if (!allowed.has(target)) {
+      throw new BadRequestException("Unsupported payout status.");
+    }
+
+    const externalReference = String(
+      input.externalReference ?? "",
+    ).trim().slice(0, 160);
+    const proofMetadata =
+      input.proofMetadata &&
+      typeof input.proofMetadata === "object" &&
+      !Array.isArray(input.proofMetadata)
+        ? (input.proofMetadata as Record<string, unknown>)
+        : {};
+
+    return this.database.withTransaction(async (client) => {
+      const current = await client.query<{
+        id: string;
+        account_id: string;
+        wallet_id: string | null;
+        amount: string;
+        status: string;
+        external_reference: string | null;
+        proof_metadata: Record<string, unknown>;
+      }>(
+        `
+        select
+          id,account_id,wallet_id,amount::text,status,
+          external_reference,proof_metadata
+        from controlplane.payout_requests
+        where id=$1::uuid
+        limit 1
+        for update
+        `,
+        [payoutId],
+      );
+
+      const row = current.rows[0];
+      if (!row) throw new NotFoundException("Payout request not found.");
+      if (!row.wallet_id) {
+        throw new ConflictException("Payout has no wallet reservation.");
+      }
+
+      const transitions: Record<string, string[]> = {
+        DRAFT: ["PROCESSING", "REJECTED", "CANCELED"],
+        APPROVAL_REQUIRED: ["PROCESSING", "REJECTED", "CANCELED"],
+        APPROVED: ["PROCESSING", "REJECTED", "CANCELED"],
+        PROCESSING: ["PAID", "FAILED", "CANCELED"],
+        PAID: ["CONFIRMED", "FAILED"],
+      };
+      if (!(transitions[row.status] ?? []).includes(target)) {
+        throw new ConflictException(
+          `Cannot transition payout from ${row.status} to ${target}.`,
+        );
+      }
+
+      const amount = Number(row.amount);
+      if (["REJECTED", "CANCELED", "FAILED"].includes(target)) {
+        await client.query(
+          `
+          update public.wallet_balances
+          set reserved=reserved-$2::numeric,
+              available=available+$2::numeric,
+              updated_at=now()
+          where wallet_id=$1::uuid
+            and reserved >= $2::numeric
+          `,
+          [row.wallet_id, amount],
+        );
+      } else if (target === "CONFIRMED") {
+        await client.query(
+          `
+          update public.wallet_balances
+          set reserved=reserved-$2::numeric,
+              updated_at=now()
+          where wallet_id=$1::uuid
+            and reserved >= $2::numeric
+          `,
+          [row.wallet_id, amount],
+        );
+      }
+
+      const updated = await client.query<{
+        id: string;
+        status: string;
+        external_reference: string | null;
+        approved_at: string | null;
+        paid_at: string | null;
+        confirmed_at: string | null;
+      }>(
+        `
+        update controlplane.payout_requests
+        set
+          status=$2::varchar,
+          external_reference=case
+            when $3::text <> '' then $3::varchar
+            else external_reference
+          end,
+          proof_metadata=coalesce(proof_metadata,'{}'::jsonb) || $4::jsonb,
+          approved_at=case
+            when $2::text='PROCESSING' then coalesce(approved_at,now())
+            else approved_at
+          end,
+          paid_at=case
+            when $2::text='PAID' then coalesce(paid_at,now())
+            else paid_at
+          end,
+          confirmed_at=case
+            when $2::text='CONFIRMED' then coalesce(confirmed_at,now())
+            else confirmed_at
+          end,
+          updated_at=now()
+        where id=$1::uuid
+        returning
+          id,status,external_reference,
+          approved_at::text,paid_at::text,confirmed_at::text
+        `,
+        [
+          payoutId,
+          target,
+          externalReference,
+          JSON.stringify(proofMetadata),
+        ],
+      );
+
+      await client.query(
+        `
+        insert into public.audit_logs(
+          id,actor_type,actor_user_id,action,resource_type,resource_id,
+          before,after,metadata,created_at
+        )
+        values(
+          gen_random_uuid(),'ADMIN',$1::uuid,'PAYOUT_STATUS_CHANGED',
+          'payout_request',$2::varchar,
+          $3::jsonb,$4::jsonb,$5::jsonb,now()
+        )
+        `,
+        [
+          admin.authUserId,
+          payoutId,
+          JSON.stringify({
+            status: row.status,
+            externalReference: row.external_reference,
+          }),
+          JSON.stringify(updated.rows[0]),
+          JSON.stringify({ amount }),
+        ],
+      );
+
+      return { success: true, data: updated.rows[0] };
+    });
+  }
+
   async usersOverview() {
     const result = await this.database.query(
       `
