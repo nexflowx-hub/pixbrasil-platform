@@ -2,10 +2,8 @@
 
 import {
   Activity,
-  ArrowRight,
   BanknoteArrowUp,
   BarChart3,
-  BookOpen,
   Building2,
   CalendarDays,
   CheckCircle2,
@@ -15,7 +13,6 @@ import {
   GitBranch,
   HelpCircle,
   KeyRound,
-  Landmark,
   Layers3,
   LoaderCircle,
   LogOut,
@@ -321,7 +318,7 @@ export function ClientPortal() {
 
   useEffect(() => {
     if (!accountId) return;
-    void loadOverview(accountId);
+    void Promise.resolve().then(() => loadOverview(accountId));
   }, [accountId, loadOverview]);
 
   const activeAccess = useMemo(
