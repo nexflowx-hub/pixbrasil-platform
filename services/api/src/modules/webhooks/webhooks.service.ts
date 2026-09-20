@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
+import { FinancialCoreService } from "../financial-core/financial-core.service";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
 import type { NormalizedProviderStatus } from "../providers/provider-adapter";
 import { MerchantWebhooksService } from "../merchant-webhooks/merchant-webhooks.service";
@@ -28,6 +29,7 @@ export class WebhooksService {
     private readonly database: DatabaseService,
     private readonly providers: ProviderAdapterRegistry,
     private readonly merchantWebhooks: MerchantWebhooksService,
+    private readonly financial: FinancialCoreService,
   ) {}
 
   async handleMisticPay(
@@ -98,11 +100,30 @@ export class WebhooksService {
       "MISTICPAY",
     );
 
-    if (payment && !persisted.replay) {
-      await this.merchantWebhooks.deliverPaymentEvent(
-        this.toMerchantEventType(payment.status),
-        payment,
-      );
+    if (payment) {
+      if (verifiedStatus === "SUCCEEDED") {
+        await this.financial.postPaymentSuccess(
+          payment.paymentIntentId,
+          "MISTICPAY",
+          transactionId,
+          redactedPayload,
+        );
+      } else if (
+        verifiedStatus === "CANCELED" ||
+        verifiedStatus === "REFUNDED"
+      ) {
+        await this.financial.reversePayment(
+          payment.paymentIntentId,
+          "MISTICPAY_" + verifiedStatus,
+        );
+      }
+
+      if (!persisted.replay) {
+        await this.merchantWebhooks.deliverPaymentEvent(
+          this.toMerchantEventType(payment.status),
+          payment,
+        );
+      }
     }
 
     return {
@@ -209,11 +230,30 @@ export class WebhooksService {
       "PIXGO",
     );
 
-    if (payment && !persisted.replay) {
-      await this.merchantWebhooks.deliverPaymentEvent(
-        this.toMerchantEventType(payment.status),
-        payment,
-      );
+    if (payment) {
+      if (verifiedStatus === "SUCCEEDED") {
+        await this.financial.postPaymentSuccess(
+          payment.paymentIntentId,
+          "PIXGO",
+          paymentId,
+          redactedPayload,
+        );
+      } else if (
+        verifiedStatus === "CANCELED" ||
+        verifiedStatus === "REFUNDED"
+      ) {
+        await this.financial.reversePayment(
+          payment.paymentIntentId,
+          "PIXGO_" + verifiedStatus,
+        );
+      }
+
+      if (!persisted.replay) {
+        await this.merchantWebhooks.deliverPaymentEvent(
+          this.toMerchantEventType(payment.status),
+          payment,
+        );
+      }
     }
 
     return {
