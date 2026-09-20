@@ -9,6 +9,7 @@ import { DatabaseService } from "../database/database.service";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
 import type { NormalizedProviderStatus } from "../providers/provider-adapter";
 import { MerchantWebhooksService } from "../merchant-webhooks/merchant-webhooks.service";
+import { SettlementsService } from "../settlements/settlements.service";
 
 interface MisticWebhookPayload {
   transactionId?: string | number;
@@ -28,6 +29,7 @@ export class WebhooksService {
     private readonly database: DatabaseService,
     private readonly providers: ProviderAdapterRegistry,
     private readonly merchantWebhooks: MerchantWebhooksService,
+    private readonly settlements: SettlementsService,
   ) {}
 
   async handleMisticPay(
@@ -99,6 +101,13 @@ export class WebhooksService {
     );
 
     if (payment && !persisted.replay) {
+      if (payment.status === "SUCCEEDED") {
+        const settlement = await this.settlements.postVerifiedPayment(
+          payment.paymentIntentId,
+        );
+        payment.settlement = settlement;
+      }
+
       await this.merchantWebhooks.deliverPaymentEvent(
         this.toMerchantEventType(payment.status),
         payment,
