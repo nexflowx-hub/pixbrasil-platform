@@ -25,7 +25,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/logo";
 
@@ -181,20 +181,21 @@ export function BusinessDashboard({
   const payouts = business?.payouts ?? [];
   const cashFlow = business?.cashFlow ?? [];
 
-  const filteredPayments = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    if (!term) return payments.slice(0, 8);
-    return payments
-      .filter((row) =>
-        [
-          row.external_reference,
-          row.store_code,
-          row.status,
-          row.amount,
-        ].some((value) => String(value ?? "").toLowerCase().includes(term)),
-      )
-      .slice(0, 20);
-  }, [payments, query]);
+  const searchTerm = query.trim().toLowerCase();
+  const filteredPayments = (
+    searchTerm
+      ? payments.filter((row) =>
+          [
+            row.external_reference,
+            row.store_code,
+            row.status,
+            row.amount,
+          ].some((value) =>
+            String(value ?? "").toLowerCase().includes(searchTerm),
+          ),
+        )
+      : payments
+  ).slice(0, searchTerm ? 20 : 8);
 
   async function submitPayout(event: FormEvent) {
     event.preventDefault();
