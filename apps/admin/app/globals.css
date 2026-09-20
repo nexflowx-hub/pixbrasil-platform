@@ -768,3 +768,101 @@ td strong { color:#c9d8d5; }
   }
   .merchant-key-row .danger-button { width: 100%; }
 }
+
+.payout-ticket-list {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+.payout-ticket-card {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #041112;
+  padding: 14px;
+}
+.payout-ticket-main,
+.payout-ticket-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.payout-ticket-main strong,
+.payout-ticket-main small {
+  display: block;
+}
+.payout-ticket-main > div:first-child > strong {
+  margin-top: 4px;
+  font-size: 11px;
+}
+.payout-ticket-main small {
+  margin-top: 4px;
+  color: var(--muted-2);
+  font-size: 8px;
+}
+.payout-ticket-amount {
+  text-align: right;
+}
+.payout-ticket-amount > strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.payout-ticket-destination,
+.payout-proof-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.payout-ticket-destination > span,
+.payout-proof-field > span {
+  color: var(--muted-2);
+  font-size: 8px;
+  font-weight: 700;
+}
+.payout-ticket-destination code {
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #020b0d;
+  padding: 9px;
+  color: #9eb6af;
+  font-size: 8px;
+}
+.payout-proof-field input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  outline: none;
+  background: #020b0d;
+  color: var(--text);
+  padding: 10px;
+  font-size: 9px;
+}
+.payout-proof-field input:focus {
+  border-color: rgba(33,242,154,.35);
+}
+.payout-ticket-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.status-chip.danger {
+  border-color: rgba(255,107,107,.24);
+  background: rgba(255,107,107,.055);
+  color: #ff9898;
+}
+@media (max-width: 720px) {
+  .payout-ticket-main,
+  .payout-ticket-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .payout-ticket-amount {
+    text-align: left;
+  }
+  .payout-ticket-actions button {
+    width: 100%;
+  }
+}
