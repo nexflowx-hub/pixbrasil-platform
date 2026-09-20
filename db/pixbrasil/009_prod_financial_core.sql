@@ -105,7 +105,7 @@ set availability_mode='FIXED_DELAY',
     available_after_minutes=1440,
     max_release_minutes=1440,
     updated_at=now(),
-    metadata=coalesce(metadata,'{}'::jsonb) ||
+    metadata=coalesce(rr.metadata,'{}'::jsonb) ||
       '{"productionPolicy":"D1_24H_INTERNAL_HOLD"}'::jsonb
 from pixbrasil.release_profiles rp
 where rr.release_profile_id=rp.id
