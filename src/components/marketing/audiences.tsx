@@ -10,7 +10,7 @@ const BENEFITS_PERSONAL = [
 ];
 
 const BENEFITS_BUSINESS = [
-  "API PIX S2S em piloto",
+  "API PIX S2S em produção",
   "Stores e routing por operação",
   "Liquidação em ativos digitais",
   "Suporte especializado",
