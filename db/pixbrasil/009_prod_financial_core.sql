@@ -115,3 +115,24 @@ where rr.release_profile_id=rp.id
 
 comment on column controlplane.payout_requests.destination_vault_secret_id is
   'Supabase Vault secret id containing the payout destination. destination_snapshot stores masked metadata only.';
+
+
+-- PixGo currently enforces a minimum PIX amount of BRL 10.00.
+update pixbrasil.routing_routes rr
+set min_amount=greatest(coalesce(rr.min_amount,0),10),
+    updated_at=now()
+from pixbrasil.gateway_connections gc
+join public.providers p on p.id=gc.provider_id
+where rr.gateway_connection_id=gc.id
+  and p.code='PIXGO'
+  and rr.enabled=true;
+
+update controlplane.feature_flags
+set description='Production manual payout ticket queue. Requests reserve Wallet BRL and are completed by operations.',
+    updated_at=now()
+where key='manual_payouts';
+
+update controlplane.feature_flags
+set description='Global production routing enforcement. Enable only with ENFORCED Store policies and matching API runtime.',
+    updated_at=now()
+where key='routing_enforcement';
