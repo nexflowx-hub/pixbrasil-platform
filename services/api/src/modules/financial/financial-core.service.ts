@@ -23,6 +23,7 @@ interface Foundation {
   walletId: string;
   customerLedgerId: string;
   clearingLedgerId: string;
+  revenueLedgerId: string;
 }
 
 function money(value: unknown): number {
@@ -225,6 +226,8 @@ export class FinancialCoreService {
         );
 
         ledgerTransactionId = ledger.rows[0].id;
+        const providerSettlementNet = money(net + platformFee);
+
         await client.query(
           `
           insert into public.ledger_entries(
@@ -232,17 +235,40 @@ export class FinancialCoreService {
             direction,amount,created_at
           )
           values
-            (gen_random_uuid(),$1::uuid,$2::uuid,$4::uuid,'DEBIT',$5::numeric,now()),
-            (gen_random_uuid(),$1::uuid,$3::uuid,$4::uuid,'CREDIT',$5::numeric,now())
+            (gen_random_uuid(),$1::uuid,$2::uuid,$5::uuid,'DEBIT',$6::numeric,now()),
+            (gen_random_uuid(),$1::uuid,$3::uuid,$5::uuid,'CREDIT',$7::numeric,now())
           `,
           [
             ledgerTransactionId,
             foundation.clearingLedgerId,
             foundation.customerLedgerId,
+            foundation.revenueLedgerId,
             foundation.assetId,
+            providerSettlementNet,
             net,
           ],
         );
+
+        if (platformFee > 0) {
+          await client.query(
+            `
+            insert into public.ledger_entries(
+              id,ledger_transaction_id,ledger_account_id,asset_id,
+              direction,amount,created_at
+            )
+            values(
+              gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,
+              'CREDIT',$4::numeric,now()
+            )
+            `,
+            [
+              ledgerTransactionId,
+              foundation.revenueLedgerId,
+              foundation.assetId,
+              platformFee,
+            ],
+          );
+        }
       }
 
       await client.query(
@@ -500,11 +526,28 @@ export class FinancialCoreService {
       [assetId],
     );
 
+    const revenueLedger = await client.query<{ id: string }>(
+      `
+      insert into public.ledger_accounts(
+        id,code,type,owner_account_id,asset_id,name,active,created_at,updated_at
+      )
+      values(
+        gen_random_uuid(),'REVENUE:PIXBRASIL:BRL','REVENUE',null,$1::uuid,
+        'PiXBrasil Revenue BRL',true,now(),now()
+      )
+      on conflict (code)
+      do update set active=true,updated_at=excluded.updated_at
+      returning id
+      `,
+      [assetId],
+    );
+
     return {
       assetId,
       walletId,
       customerLedgerId: customerLedger.rows[0].id,
       clearingLedgerId: clearingLedger.rows[0].id,
+      revenueLedgerId: revenueLedger.rows[0].id,
     };
   }
 }
