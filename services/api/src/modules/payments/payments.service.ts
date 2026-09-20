@@ -413,6 +413,16 @@ export class PaymentsService {
       );
     }
 
+    if (
+      config.activation_mode === "ENFORCED" &&
+      (config.account_status !== "ACTIVE" ||
+        config.account_kyc_status !== "APPROVED")
+    ) {
+      throw new ForbiddenException(
+        "Live PIX requires an ACTIVE account with APPROVED KYC.",
+      );
+    }
+
     const requestFingerprint = createHash("sha256")
       .update(
         JSON.stringify({
