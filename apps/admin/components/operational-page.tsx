@@ -191,7 +191,7 @@ export function OperationalPage({ kind }: { kind: Kind }) {
         <article className="metric-card tone-aqua">
           <div className="metric-top"><span>Visible records</span><Icon size={17} /></div>
           <strong>{String(total).padStart(2, "0")}</strong>
-          <p>read-only operational view</p>
+          <p>operational control view</p>
           <div className="metric-line" />
         </article>
         <article className="metric-card tone-green">
@@ -234,7 +234,7 @@ export function OperationalPage({ kind }: { kind: Kind }) {
       {kind === "risk" ? (
         <div className="warning-banner">
           <ShieldCheck size={17} />
-          Risk scoring transacional dedicado ainda não está ativo. O painel mostra apenas postura factual do MVP.
+          Risk scoring transacional dedicado ainda não está ativo. O painel apresenta a postura factual atual da operação.
         </div>
       ) : null}
     </div>
