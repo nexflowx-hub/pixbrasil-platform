@@ -392,15 +392,26 @@ export class ClientService {
         wallets: walletResult.rows,
         transactions: txResult.rows,
         business,
-        capabilities: {
-          financialWritesEnabled: true,
-          depositsEnabled: true,
-          withdrawalsEnabled: true,
-          exchangeEnabled: false,
-          payoutMode: "MANUAL_TICKET",
-          note:
-            "PIX production is active. Payouts are processed through the manual operations ticket queue.",
-        },
+        capabilities:
+          account.type === "BUSINESS"
+            ? {
+                financialWritesEnabled: true,
+                depositsEnabled: true,
+                withdrawalsEnabled: true,
+                exchangeEnabled: false,
+                payoutMode: "MANUAL_TICKET",
+                note:
+                  "PIX production is active. Payouts are processed through the manual operations ticket queue.",
+              }
+            : {
+                financialWritesEnabled: false,
+                depositsEnabled: false,
+                withdrawalsEnabled: false,
+                exchangeEnabled: false,
+                payoutMode: null,
+                note:
+                  "Personal account capabilities are shown according to the products enabled for this account.",
+              },
       },
     };
   }
