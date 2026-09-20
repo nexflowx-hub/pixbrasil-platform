@@ -1436,7 +1436,7 @@ export class AdminService {
   }
 
   async riskOverview() {
-    const [accounts, webhooks, intents] = await Promise.all([
+    const [accounts, webhooks, intents, flags] = await Promise.all([
       this.database.query(
         `
         select
@@ -1464,6 +1464,18 @@ export class AdminService {
         order by status
         `,
       ),
+      this.database.query<{ key: string; enabled: boolean }>(
+        `
+        select key,enabled
+        from controlplane.feature_flags
+        where key in (
+          'routing_enforcement',
+          'live_payment_execution',
+          'manual_payouts',
+          'manual_ledger_adjustments'
+        )
+        `,
+      ),
     ]);
 
     return {
@@ -1473,10 +1485,20 @@ export class AdminService {
         webhookPosture: webhooks.rows,
         paymentPosture: intents.rows,
         controls: {
-          liveExecution: false,
-          automaticPayouts: false,
-          manualLedgerAdjustments: false,
-          note: "No dedicated risk scoring engine is active in the MVP.",
+          routingEnforcement: Boolean(
+            flags.rows.find((flag) => flag.key === "routing_enforcement")?.enabled,
+          ),
+          liveExecution: Boolean(
+            flags.rows.find((flag) => flag.key === "live_payment_execution")?.enabled,
+          ),
+          manualPayouts: Boolean(
+            flags.rows.find((flag) => flag.key === "manual_payouts")?.enabled,
+          ),
+          manualLedgerAdjustments: Boolean(
+            flags.rows.find((flag) => flag.key === "manual_ledger_adjustments")?.enabled,
+          ),
+          note:
+            "Dedicated transaction risk scoring is separate from the current operational posture view.",
         },
       },
     };
@@ -1515,6 +1537,7 @@ export class AdminService {
         from controlplane.feature_flags
         where key in (
           'routing_enforcement',
+          'live_payment_execution',
           'provider_auto_webhook_registration',
           'manual_payouts',
           'manual_ledger_adjustments'
