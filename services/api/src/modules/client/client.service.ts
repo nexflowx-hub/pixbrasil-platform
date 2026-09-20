@@ -342,7 +342,16 @@ export class ClientService {
                 gc.alias as gateway_alias,
                 coalesce(gc.metadata->>'lastConnectionHealth','UNKNOWN') as health,
                 nullif(gc.metadata->>'lastConnectionLatencyMs','')::int as latency_ms,
-                gc.metadata->>'lastConnectionTestedAt' as tested_at
+                gc.metadata->>'lastConnectionTestedAt' as tested_at,
+                coalesce(stats.attempts_30d,0)::int as attempts_30d,
+                coalesce(stats.successes_30d,0)::int as successes_30d,
+                case
+                  when coalesce(stats.attempts_30d,0) = 0 then null
+                  else round(
+                    (stats.successes_30d::numeric / stats.attempts_30d::numeric) * 100,
+                    2
+                  )
+                end::text as success_rate_30d
               from pixbrasil.stores s
               join pixbrasil.routing_policies rp
                 on rp.store_id=s.id and rp.status='ACTIVE'
@@ -351,6 +360,15 @@ export class ClientService {
               join pixbrasil.gateway_connections gc
                 on gc.id=rr.gateway_connection_id
               join public.providers p on p.id=gc.provider_id
+              left join lateral (
+                select
+                  count(*)::int as attempts_30d,
+                  count(*) filter (where pi.status='SUCCEEDED')::int as successes_30d
+                from pixbrasil.provider_attempts pa
+                join pixbrasil.payment_intents pi on pi.id=pa.payment_intent_id
+                where pa.gateway_connection_id=gc.id
+                  and pa.started_at >= now() - interval '30 days'
+              ) stats on true
               where s.merchant_id=$1::uuid
               order by p.code,rp.priority asc
               `,
