@@ -147,8 +147,8 @@ export function AudienceProductPage({ audience }: { audience: Audience }) {
 }
 
 function StatusBadge({ value }: { value: string }) {
-  const available = value === "AVAILABLE";
-  const validating = value === "VALIDATING" || value === "SHADOW";
+  const available = value === "AVAILABLE" || value === "PRODUCTION";
+  const validating = value === "MANUAL" || value === "POLICY";
   const Icon = available ? CheckCircle2 : validating ? Clock3 : CircleDashed;
   return (
     <span className={[
