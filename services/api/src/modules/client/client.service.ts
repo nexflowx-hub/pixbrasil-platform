@@ -276,10 +276,110 @@ export class ClientService {
           [merchant.merchant_id],
         );
 
+        const settlements = await this.database.query(
+          `
+          select
+            s.code as store_code,
+            s.name as store_name,
+            rel.release_class,
+            coalesce(sum(st.net_brl) filter (where st.status='AVAILABLE'),0)::text as available_brl,
+            coalesce(sum(st.net_brl) filter (where st.status='PENDING'),0)::text as pending_brl,
+            coalesce(sum(st.net_brl) filter (where st.status='RESERVED'),0)::text as reserved_brl,
+            min(st.available_at) filter (where st.status='PENDING')::text as next_available_at,
+            count(st.id)::int as settlement_count
+          from pixbrasil.stores s
+          left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
+          left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
+          left join pixbrasil.payment_intents pi on pi.store_id=s.id
+          left join pixbrasil.settlements st on st.payment_intent_id=pi.id
+          where s.merchant_id=$1::uuid
+          group by s.id,rel.release_class
+          order by s.code
+          `,
+          [merchant.merchant_id],
+        );
+
+        const gateways = await this.database.query(
+          `
+          select distinct
+            p.code as provider_code,
+            gc.alias as gateway_alias,
+            gc.status,
+            gc.metadata->>'lastConnectionHealth' as health,
+            nullif(gc.metadata->>'lastConnectionLatencyMs','')::int as latency_ms,
+            gc.metadata->>'credentialState' as credential_state,
+            rp.activation_mode
+          from pixbrasil.stores s
+          join pixbrasil.routing_policies rp
+            on rp.store_id=s.id and rp.status='ACTIVE'
+          join pixbrasil.routing_routes rr
+            on rr.policy_id=rp.id and rr.enabled=true
+          join pixbrasil.gateway_connections gc on gc.id=rr.gateway_connection_id
+          join public.providers p on p.id=gc.provider_id
+          where s.merchant_id=$1::uuid
+          order by p.code,gc.alias
+          `,
+          [merchant.merchant_id],
+        );
+
+        const cashFlow = await this.database.query(
+          `
+          with days as (
+            select generate_series(
+              current_date - interval '29 days',
+              current_date,
+              interval '1 day'
+            )::date day
+          ),
+          incoming as (
+            select st.created_at::date day,sum(st.net_brl) amount
+            from pixbrasil.settlements st
+            join pixbrasil.payment_intents pi on pi.id=st.payment_intent_id
+            where pi.merchant_id=$1::uuid
+              and st.status in ('AVAILABLE','PENDING','RESERVED')
+              and st.created_at>=current_date - interval '29 days'
+            group by st.created_at::date
+          ),
+          outgoing as (
+            select pr.created_at::date day,sum(pr.amount) amount
+            from controlplane.payout_requests pr
+            where pr.account_id=$2::uuid
+              and pr.status in ('PROCESSING','PAID','CONFIRMED')
+              and pr.created_at>=current_date - interval '29 days'
+            group by pr.created_at::date
+          )
+          select
+            d.day::text,
+            coalesce(i.amount,0)::text incoming_brl,
+            coalesce(o.amount,0)::text outgoing_brl
+          from days d
+          left join incoming i on i.day=d.day
+          left join outgoing o on o.day=d.day
+          order by d.day
+          `,
+          [merchant.merchant_id, accountId],
+        );
+
+        const payouts = await this.database.query(
+          `
+          select id,amount::text,status,destination_type,destination_snapshot,
+                 created_at::text,paid_at::text,confirmed_at::text
+          from controlplane.payout_requests
+          where account_id=$1::uuid
+          order by created_at desc
+          limit 20
+          `,
+          [accountId],
+        );
+
         business = {
           merchant,
           stores: stores.rows,
           payments: payments.rows,
+          settlements: settlements.rows,
+          gateways: gateways.rows,
+          cashFlow: cashFlow.rows,
+          payouts: payouts.rows,
         };
       }
     }
@@ -293,12 +393,13 @@ export class ClientService {
         transactions: txResult.rows,
         business,
         capabilities: {
-          financialWritesEnabled: false,
-          depositsEnabled: false,
-          withdrawalsEnabled: false,
+          financialWritesEnabled: true,
+          depositsEnabled: true,
+          withdrawalsEnabled: true,
           exchangeEnabled: false,
+          payoutMode: "MANUAL_TICKET",
           note:
-            "MVP client portal is read-only while payment execution, settlement and payout guardrails are validated.",
+            "PIX production is active. Payouts are processed through the manual operations ticket queue.",
         },
       },
     };
