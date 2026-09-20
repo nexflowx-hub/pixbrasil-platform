@@ -53,13 +53,13 @@ export function ClientLogin() {
           <div className="max-w-xl pb-10">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#20F29A]/20 bg-[#20F29A]/6 px-3 py-1.5 text-[11px] font-semibold tracking-[.13em] text-[#79D9BA]">
               <ShieldCheck className="h-3.5 w-3.5" />
-              CLIENT PORTAL · MVP CONTROLADO
+              CLIENT PORTAL · PRODUÇÃO
             </span>
             <h1 className="mt-7 text-5xl font-semibold leading-[1.03] tracking-[-.055em] xl:text-6xl">
               Uma visão clara do seu dinheiro, sem esconder o estado operacional.
             </h1>
             <p className="mt-6 max-w-lg text-[15px] leading-7 text-[#8FA7A1]">
-              Acesse contas Personal e Business, wallets, Stores e atividade a partir do mesmo portal. Operações financeiras permanecem bloqueadas até a ativação segura de cada rail.
+              Acesse contas Personal e Business, wallets, Stores e atividade a partir do mesmo portal. Operações financeiras seguem as permissões e políticas ativas de cada conta.
             </p>
           </div>
 
