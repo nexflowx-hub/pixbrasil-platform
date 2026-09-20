@@ -410,26 +410,69 @@ export class PaymentsService {
       id: string;
       metadata: Record<string, unknown>;
       status: string;
+      attempt_status: string | null;
+      provider_payment_id: string | null;
     }>(
       `
-      select id,metadata,status
-      from pixbrasil.payment_intents
-      where account_id=$1::uuid and idempotency_key=$2::varchar
+      select
+        pi.id,
+        pi.metadata,
+        pi.status,
+        pa.status as attempt_status,
+        pa.provider_payment_id
+      from pixbrasil.payment_intents pi
+      left join lateral (
+        select pa0.status,pa0.provider_payment_id
+        from pixbrasil.provider_attempts pa0
+        where pa0.payment_intent_id=pi.id
+        order by pa0.attempt_no desc
+        limit 1
+      ) pa on true
+      where pi.account_id=$1::uuid
+        and pi.idempotency_key=$2::varchar
       limit 1
       `,
       [merchant.accountId, idempotencyKey],
     );
 
+    let resumablePaymentIntentId: string | null = null;
+
     if (existing.rows[0]) {
+      const row = existing.rows[0];
       const storedFingerprint = String(
-        existing.rows[0].metadata?.requestFingerprint ?? "",
+        row.metadata?.requestFingerprint ?? "",
       );
       if (storedFingerprint && storedFingerprint !== requestFingerprint) {
         throw new ConflictException(
           "Idempotency-Key was already used with a different payment payload.",
         );
       }
-      return this.loadChargeResult(existing.rows[0].id, true);
+
+      if (
+        row.attempt_status &&
+        !row.provider_payment_id &&
+        ["STARTED", "AMBIGUOUS"].includes(row.attempt_status)
+      ) {
+        await this.database.query(
+          `
+          update pixbrasil.payment_intents
+          set status='RECONCILIATION_REQUIRED',updated_at=now()
+          where id=$1::uuid
+            and status not in ('SUCCEEDED','FAILED','CANCELED')
+          `,
+          [row.id],
+        );
+        return this.loadChargeResult(row.id, true);
+      }
+
+      if (
+        !row.attempt_status &&
+        ["ROUTING", "CREATED", "PROVIDER_PENDING"].includes(row.status)
+      ) {
+        resumablePaymentIntentId = row.id;
+      } else {
+        return this.loadChargeResult(row.id, true);
+      }
     }
 
     const routeCostRule = await this.database.query<FeeRuleRow>(
@@ -528,51 +571,55 @@ export class PaymentsService {
         : {}),
     };
 
-    const inserted = await this.database.query<{ id: string }>(
-      `
-      insert into pixbrasil.payment_intents(
-        account_id,merchant_id,store_id,external_reference,idempotency_key,
-        payment_method,amount,currency,status,customer_snapshot,metadata
-      )
-      values(
-        $1::uuid,$2::uuid,$3::uuid,$4::varchar,$5::varchar,
-        'PIX',$6::numeric,'BRL','ROUTING',$7::jsonb,$8::jsonb
-      )
-      on conflict (account_id,idempotency_key) do nothing
-      returning id
-      `,
-      [
-        merchant.accountId,
-        merchant.merchantId,
-        config.store_id,
-        reference,
-        idempotencyKey,
-        normalizedAmount,
-        JSON.stringify(customerSnapshot),
-        JSON.stringify({
-          requestFingerprint,
-          description: String(input.description ?? "").slice(0, 200),
-          merchantMetadata,
-        }),
-      ],
-    );
+    let paymentIntentId = resumablePaymentIntentId;
 
-    if (!inserted.rows[0]) {
-      const duplicate = await this.database.query<{ id: string }>(
+    if (!paymentIntentId) {
+      const inserted = await this.database.query<{ id: string }>(
         `
-        select id from pixbrasil.payment_intents
-        where account_id=$1::uuid and idempotency_key=$2::varchar
-        limit 1
+        insert into pixbrasil.payment_intents(
+          account_id,merchant_id,store_id,external_reference,idempotency_key,
+          payment_method,amount,currency,status,customer_snapshot,metadata
+        )
+        values(
+          $1::uuid,$2::uuid,$3::uuid,$4::varchar,$5::varchar,
+          'PIX',$6::numeric,'BRL','ROUTING',$7::jsonb,$8::jsonb
+        )
+        on conflict (account_id,idempotency_key) do nothing
+        returning id
         `,
-        [merchant.accountId, idempotencyKey],
+        [
+          merchant.accountId,
+          merchant.merchantId,
+          config.store_id,
+          reference,
+          idempotencyKey,
+          normalizedAmount,
+          JSON.stringify(customerSnapshot),
+          JSON.stringify({
+            requestFingerprint,
+            description: String(input.description ?? "").slice(0, 200),
+            merchantMetadata,
+          }),
+        ],
       );
-      if (!duplicate.rows[0]) {
-        throw new ConflictException("Unable to resolve idempotent payment.");
-      }
-      return this.loadChargeResult(duplicate.rows[0].id, true);
-    }
 
-    const paymentIntentId = inserted.rows[0].id;
+      if (!inserted.rows[0]) {
+        const duplicate = await this.database.query<{ id: string }>(
+          `
+          select id from pixbrasil.payment_intents
+          where account_id=$1::uuid and idempotency_key=$2::varchar
+          limit 1
+          `,
+          [merchant.accountId, idempotencyKey],
+        );
+        if (!duplicate.rows[0]) {
+          throw new ConflictException("Unable to resolve idempotent payment.");
+        }
+        return this.loadChargeResult(duplicate.rows[0].id, true);
+      }
+
+      paymentIntentId = inserted.rows[0].id;
+    }
 
     const candidatesResult = await this.database.query<CandidateRow>(
       `
