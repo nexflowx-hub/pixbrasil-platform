@@ -607,7 +607,17 @@ export class PaymentsService {
           (row) => row.connection_id === selected.connectionId,
         )
       : undefined;
-    const outcome = selected ? "SHADOW_ONLY" : "NO_ROUTE";
+    const routingFlag = await this.database.query<{ enabled: boolean }>(
+      `select enabled from controlplane.feature_flags where key='routing_enforcement' limit 1`,
+    );
+    const liveExecution =
+      Boolean(routingFlag.rows[0]?.enabled) &&
+      config.activation_mode === "ENFORCED";
+    const outcome = selected
+      ? liveExecution
+        ? "SELECTED"
+        : "SHADOW_ONLY"
+      : "NO_ROUTE";
 
     const decision = await this.database.query<{ id: string }>(
       `
@@ -639,7 +649,7 @@ export class PaymentsService {
         ),
         JSON.stringify(draft.rejected),
         JSON.stringify({
-          mode: "SHADOW",
+          mode: liveExecution ? "LIVE" : "SHADOW",
           routeCostProfile: config.route_cost_profile_code,
           releaseProfile: config.release_profile_code,
           releaseClass: config.release_class,
@@ -663,13 +673,13 @@ export class PaymentsService {
       `
       update pixbrasil.payment_intents
       set selected_connection_id=$2::uuid,
-          status='CREATED',
+          status=case when $2::uuid is null then 'FAILED' else 'CREATED' end,
           metadata=metadata || jsonb_build_object(
-            'routingMode','SHADOW',
-            'routingDecisionId',$3::text,
-            'shadowQuote',$4::jsonb,
-            'releaseProfile',$5::text,
-            'releaseClass',$6::text
+            'routingMode',$3::text,
+            'routingDecisionId',$4::text,
+            'productionQuote',$5::jsonb,
+            'releaseProfile',$6::text,
+            'releaseClass',$7::text
           ),
           updated_at=now()
       where id=$1::uuid
@@ -677,12 +687,55 @@ export class PaymentsService {
       [
         paymentIntentId,
         selected?.connectionId ?? null,
+        liveExecution ? "LIVE" : "SHADOW",
         decision.rows[0]?.id ?? null,
         JSON.stringify(quote),
         config.release_profile_code,
         config.release_class,
       ],
     );
+
+    if (!selected || !selectedRow) {
+      return this.loadPaymentResult(paymentIntentId, false);
+    }
+
+    if (liveExecution) {
+      return this.liveExecution.execute({
+        paymentIntentId,
+        routingDecisionId: decision.rows[0]?.id ?? null,
+        connectionId: selected.connectionId,
+        providerCode: selectedRow.provider_code,
+        gatewayAlias: selectedRow.gateway_alias,
+        requestFingerprint,
+        reference,
+        amount: normalizedAmount,
+        description: String(input.description ?? "").slice(0, 200),
+        payer: {
+          name: payerName,
+          taxId: payerTaxId,
+          ...(String(input.payer?.email ?? "").trim()
+            ? { email: String(input.payer?.email).trim().slice(0, 255) }
+            : {}),
+          ...(String(input.payer?.phone ?? "").trim()
+            ? { phone: String(input.payer?.phone).trim().slice(0, 32) }
+            : {}),
+        },
+        store: {
+          code: config.store_code,
+          name: config.store_name,
+        },
+        routing: {
+          policy: config.policy_name,
+          policyVersion: config.policy_version,
+          releaseClass: config.release_class,
+        },
+        economics: quote,
+        release: {
+          profile: config.release_profile_code,
+          rules: releaseRules.rows,
+        },
+      });
+    }
 
     return {
       success: true,
@@ -701,8 +754,8 @@ export class PaymentsService {
           mode: "SHADOW",
           policy: config.policy_name,
           policyVersion: config.policy_version,
-          providerCode: selectedRow?.provider_code ?? null,
-          gatewayAlias: selectedRow?.gateway_alias ?? null,
+          providerCode: selectedRow.provider_code,
+          gatewayAlias: selectedRow.gateway_alias,
           releaseClass: config.release_class,
           crossReleaseClassFailover: false,
         },
