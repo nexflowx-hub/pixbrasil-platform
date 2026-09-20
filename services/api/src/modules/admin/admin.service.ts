@@ -1004,8 +1004,10 @@ export class AdminService {
         ass.symbol,
         pr.amount::text,
         pr.destination_type,
+        pr.destination_snapshot,
         pr.status,
         pr.external_reference,
+        pr.proof_metadata,
         pr.approval_request_id,
         pr.approved_at,
         pr.paid_at,
@@ -1019,6 +1021,330 @@ export class AdminService {
       `,
     );
     return { success: true, data: result.rows };
+  }
+
+  async updatePayoutStatus(
+    payoutId: string,
+    body: Record<string, unknown>,
+    admin: AdminContext,
+  ) {
+    const target = String(body.status ?? "").trim().toUpperCase();
+    const allowedTargets = [
+      "APPROVED",
+      "PROCESSING",
+      "PAID",
+      "CONFIRMED",
+      "REJECTED",
+      "CANCELED",
+      "FAILED",
+    ];
+    if (!allowedTargets.includes(target)) {
+      throw new BadRequestException("Unsupported payout status.");
+    }
+
+    const externalReference = String(
+      body.externalReference ?? "",
+    ).trim().slice(0, 160);
+    const proof =
+      body.proof && typeof body.proof === "object" && !Array.isArray(body.proof)
+        ? (body.proof as Record<string, unknown>)
+        : {};
+
+    return this.database.transaction(async (client) => {
+      const result = await client.query<{
+        id: string;
+        account_id: string;
+        wallet_id: string | null;
+        asset_id: string;
+        asset_code: string;
+        amount: string;
+        status: string;
+        external_reference: string | null;
+      }>(
+        `
+        select
+          pr.id,
+          pr.account_id,
+          pr.wallet_id,
+          pr.asset_id,
+          a.code as asset_code,
+          pr.amount::text,
+          pr.status,
+          pr.external_reference
+        from controlplane.payout_requests pr
+        join public.assets a on a.id=pr.asset_id
+        where pr.id=$1::uuid
+        for update of pr
+        `,
+        [payoutId],
+      );
+
+      const row = result.rows[0];
+      if (!row) throw new NotFoundException("Payout ticket not found.");
+      if (!row.wallet_id) {
+        throw new ConflictException("Payout ticket has no reserved wallet.");
+      }
+
+      const transitions: Record<string, string[]> = {
+        APPROVAL_REQUIRED: ["APPROVED", "REJECTED", "CANCELED"],
+        APPROVED: ["PROCESSING", "PAID", "REJECTED", "CANCELED"],
+        PROCESSING: ["PAID", "FAILED"],
+        PAID: ["CONFIRMED"],
+        CONFIRMED: [],
+        REJECTED: [],
+        CANCELED: [],
+        FAILED: [],
+      };
+
+      if (!(transitions[row.status] ?? []).includes(target)) {
+        throw new ConflictException(
+          `Invalid payout transition ${row.status} -> ${target}.`,
+        );
+      }
+
+      const amount = Number(row.amount);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new ConflictException("Payout amount is invalid.");
+      }
+
+      if (["REJECTED", "CANCELED", "FAILED"].includes(target)) {
+        const released = await client.query(
+          `
+          update public.wallet_balances
+          set
+            reserved=reserved-$2::numeric,
+            available=available+$2::numeric,
+            updated_at=now()
+          where wallet_id=$1::uuid
+            and reserved >= $2::numeric
+          returning id
+          `,
+          [row.wallet_id, amount],
+        );
+        if (released.rowCount !== 1) {
+          throw new ConflictException(
+            "Reserved balance is insufficient to release this payout.",
+          );
+        }
+      }
+
+      if (target === "PAID") {
+        const consumed = await client.query(
+          `
+          update public.wallet_balances
+          set reserved=reserved-$2::numeric,updated_at=now()
+          where wallet_id=$1::uuid
+            and reserved >= $2::numeric
+          returning id
+          `,
+          [row.wallet_id, amount],
+        );
+        if (consumed.rowCount !== 1) {
+          throw new ConflictException(
+            "Reserved balance is insufficient to settle this payout.",
+          );
+        }
+
+        const customerCode =
+          `CUSTOMER:${row.account_id}:${row.asset_code}`;
+        const clearingCode = `CLEARING:PAYOUT:${row.asset_code}`;
+
+        const customer = await client.query<{ id: string }>(
+          `
+          insert into public.ledger_accounts(
+            id,code,type,owner_account_id,asset_id,name,active,created_at,updated_at
+          )
+          values(
+            gen_random_uuid(),$1::varchar,'CUSTOMER',$2::uuid,$3::uuid,
+            $4::varchar,true,now(),now()
+          )
+          on conflict (code)
+          do update set active=true,updated_at=excluded.updated_at
+          returning id
+          `,
+          [
+            customerCode,
+            row.account_id,
+            row.asset_id,
+            `Customer ${row.asset_code}`,
+          ],
+        );
+
+        const clearing = await client.query<{ id: string }>(
+          `
+          insert into public.ledger_accounts(
+            id,code,type,owner_account_id,asset_id,name,active,created_at,updated_at
+          )
+          values(
+            gen_random_uuid(),$1::varchar,'CLEARING',null,$2::uuid,
+            $3::varchar,true,now(),now()
+          )
+          on conflict (code)
+          do update set active=true,updated_at=excluded.updated_at
+          returning id
+          `,
+          [
+            clearingCode,
+            row.asset_id,
+            `Payout Clearing ${row.asset_code}`,
+          ],
+        );
+
+        const ledgerKey = `payout:${row.id}`;
+        const ledger = await client.query<{ id: string }>(
+          `
+          insert into public.ledger_transactions(
+            id,reference,type,status,idempotency_key,external_reference,
+            metadata,created_at,posted_at
+          )
+          values(
+            gen_random_uuid(),$1::varchar,'FIAT_WITHDRAWAL','POSTED',
+            $2::varchar,$3::varchar,$4::jsonb,now(),now()
+          )
+          on conflict (idempotency_key)
+          do update set external_reference=excluded.external_reference
+          returning id
+          `,
+          [
+            `PAYOUT:${row.id}`,
+            ledgerKey,
+            externalReference || row.external_reference,
+            JSON.stringify({
+              payoutRequestId: row.id,
+              channel: "TELEGRAM_MANUAL",
+              proof,
+            }),
+          ],
+        );
+
+        const entryCount = await client.query<{ count: string }>(
+          `
+          select count(*)::text as count
+          from public.ledger_entries
+          where ledger_transaction_id=$1::uuid
+          `,
+          [ledger.rows[0].id],
+        );
+
+        if (Number(entryCount.rows[0]?.count ?? 0) === 0) {
+          await client.query(
+            `
+            insert into public.ledger_entries(
+              id,ledger_transaction_id,ledger_account_id,asset_id,
+              direction,amount,created_at
+            )
+            values
+              (gen_random_uuid(),$1::uuid,$2::uuid,$4::uuid,'DEBIT',$5::numeric,now()),
+              (gen_random_uuid(),$1::uuid,$3::uuid,$4::uuid,'CREDIT',$5::numeric,now())
+            `,
+            [
+              ledger.rows[0].id,
+              customer.rows[0].id,
+              clearing.rows[0].id,
+              row.asset_id,
+              amount,
+            ],
+          );
+        }
+
+        await client.query(
+          `
+          insert into public.transactions(
+            id,account_id,wallet_id,ledger_transaction_id,
+            type,status,asset_id,amount,provider_reference,
+            idempotency_key,metadata,created_at,updated_at,completed_at
+          )
+          values(
+            gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,
+            'FIAT_WITHDRAWAL','COMPLETED',$4::uuid,$5::numeric,$6::varchar,
+            $7::varchar,$8::jsonb,now(),now(),now()
+          )
+          on conflict (idempotency_key) do nothing
+          `,
+          [
+            row.account_id,
+            row.wallet_id,
+            ledger.rows[0].id,
+            row.asset_id,
+            amount,
+            externalReference || row.external_reference,
+            ledgerKey,
+            JSON.stringify({
+              payoutRequestId: row.id,
+              channel: "TELEGRAM_MANUAL",
+            }),
+          ],
+        );
+      }
+
+      const updated = await client.query<{
+        id: string;
+        status: string;
+        external_reference: string | null;
+        approved_at: string | null;
+        paid_at: string | null;
+        confirmed_at: string | null;
+      }>(
+        `
+        update controlplane.payout_requests
+        set
+          status=$2::varchar,
+          external_reference=coalesce(nullif($3::varchar,''),external_reference),
+          proof_metadata=coalesce(proof_metadata,'{}'::jsonb) || $4::jsonb,
+          approved_at=case
+            when $2::text='APPROVED' then coalesce(approved_at,now())
+            else approved_at
+          end,
+          paid_at=case
+            when $2::text='PAID' then coalesce(paid_at,now())
+            else paid_at
+          end,
+          confirmed_at=case
+            when $2::text='CONFIRMED' then coalesce(confirmed_at,now())
+            else confirmed_at
+          end,
+          updated_at=now()
+        where id=$1::uuid
+        returning
+          id,status,external_reference,
+          approved_at::text,paid_at::text,confirmed_at::text
+        `,
+        [
+          payoutId,
+          target,
+          externalReference,
+          JSON.stringify({
+            ...proof,
+            lastAdminAction: target,
+            lastAdminActor: admin.authUserId,
+            lastAdminActionAt: new Date().toISOString(),
+          }),
+        ],
+      );
+
+      await client.query(
+        `
+        insert into public.audit_logs(
+          id,actor_type,actor_user_id,action,resource_type,resource_id,
+          before,after,metadata,created_at
+        )
+        values(
+          gen_random_uuid(),'ADMIN',$1::uuid,'PAYOUT_STATUS_CHANGED',
+          'payout_request',$2::text,
+          jsonb_build_object('status',$3::text),
+          jsonb_build_object('status',$4::text),
+          jsonb_build_object('channel','TELEGRAM_MANUAL'),
+          now()
+        )
+        `,
+        [admin.authUserId, payoutId, row.status, target],
+      );
+
+      return {
+        success: true,
+        data: updated.rows[0],
+      };
+    });
   }
 
   async usersOverview() {
