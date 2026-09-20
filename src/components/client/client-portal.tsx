@@ -56,7 +56,6 @@ export function ClientPortal() {
   const loadOverview = useCallback(
     async (id: string) => {
       if (!id) return;
-      setBusy(true);
       setError("");
       try {
         const response = await fetch(
@@ -140,7 +139,10 @@ export function ClientPortal() {
             <>
               <p className="mt-6 text-[11px] leading-6 text-red-600">{error}</p>
               <button
-                onClick={() => accountId && void loadOverview(accountId)}
+                onClick={() => {
+                  setBusy(true);
+                  if (accountId) void loadOverview(accountId);
+                }}
                 className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-[#0a7d65] px-4 text-[10px] font-bold text-white"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -165,8 +167,12 @@ export function ClientPortal() {
         account={activeAccount}
         overview={overview}
         busy={busy}
-        onRefresh={() => void loadOverview(accountId)}
+        onRefresh={() => {
+          setBusy(true);
+          void loadOverview(accountId);
+        }}
         onAccountChange={(id) => {
+          setBusy(true);
           setOverview(null);
           setAccountId(id);
         }}
@@ -180,9 +186,13 @@ export function ClientPortal() {
       session={session}
       overview={overview}
       busy={busy}
-      onRefresh={() => void loadOverview(accountId)}
+      onRefresh={() => {
+        setBusy(true);
+        void loadOverview(accountId);
+      }}
       onSignOut={() => void signOut()}
       onAccountChange={(id) => {
+        setBusy(true);
         setOverview(null);
         setAccountId(id);
       }}
