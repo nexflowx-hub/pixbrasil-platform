@@ -38,6 +38,8 @@ interface StoreConfigRow {
   merchant_id: string;
   account_id: string;
   merchant_tier: string;
+  account_status: string;
+  account_kyc_status: string;
   route_cost_profile_id: string;
   route_cost_profile_code: string;
   release_profile_id: string;
@@ -359,6 +361,8 @@ export class PaymentsService {
         m.id as merchant_id,
         m.account_id,
         m.tier_code as merchant_tier,
+        a.status::text as account_status,
+        a.kyc_status::text as account_kyc_status,
         sfp.route_cost_profile_id,
         rcp.code as route_cost_profile_code,
         sfp.release_profile_id,
@@ -373,6 +377,7 @@ export class PaymentsService {
         rp.activation_mode
       from pixbrasil.stores s
       join pixbrasil.merchants m on m.id=s.merchant_id
+      join public.accounts a on a.id=m.account_id
       join pixbrasil.merchant_api_key_store_grants grant_row
         on grant_row.store_id=s.id
        and grant_row.api_key_id=$1::uuid
@@ -657,6 +662,8 @@ export class PaymentsService {
           merchant.merchantId,
           config.store_code,
           config.activation_mode,
+          config.account_status,
+          config.account_kyc_status,
         )
       : false;
     const outcome = selected
@@ -869,8 +876,11 @@ export class PaymentsService {
     merchantId: string,
     storeCode: string,
     activationMode: "SHADOW" | "ENFORCED",
+    accountStatus: string,
+    kycStatus: string,
   ) {
     if (activationMode !== "ENFORCED") return false;
+    if (accountStatus !== "ACTIVE" || kycStatus !== "APPROVED") return false;
 
     const flags = await this.database.query<{
       key: string;
