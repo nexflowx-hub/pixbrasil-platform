@@ -25,7 +25,7 @@ interface SettlementRow {
   created_at: string;
 }
 
-function brl(value: string) {
+function brl(value: string | number) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
