@@ -7,6 +7,8 @@ import {
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
+import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
+import { executeProviderAttempt } from "./provider-execution";
 import type { MerchantApiContext } from "../merchant-auth/merchant-auth.types";
 import { RoutingEngineService } from "../routing/routing-engine.service";
 import type {
@@ -144,11 +146,49 @@ function normalizeMetadata(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function extractPixAction(payload: unknown) {
+  const root = asObject(payload);
+  const data = asObject(root.data);
+  const nested = asObject(data.transaction);
+
+  const copyPaste = String(
+    data.copyPaste ??
+      data.qr_code ??
+      data.qrCode ??
+      nested.copyPaste ??
+      root.copyPaste ??
+      root.qr_code ??
+      "",
+  ).trim();
+
+  const qrCodeImage = String(
+    data.qrCodeImage ??
+      data.qr_image ??
+      data.qrCodeBase64 ??
+      root.qrCodeImage ??
+      root.qr_image ??
+      "",
+  ).trim();
+
+  return {
+    type: "PIX" as const,
+    copyPaste: copyPaste || null,
+    qrCodeImage: qrCodeImage || null,
+  };
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly routing: RoutingEngineService,
+    private readonly providers: ProviderAdapterRegistry,
   ) {}
 
   async getPayment(
@@ -258,7 +298,7 @@ export class PaymentsService {
     };
   }
 
-  async createShadowCharge(
+  async createCharge(
     merchant: MerchantApiContext,
     idempotencyKeyValue: string | undefined,
     input: ChargeInput,
@@ -386,7 +426,7 @@ export class PaymentsService {
           "Idempotency-Key was already used with a different payment payload.",
         );
       }
-      return this.loadShadowResult(existing.rows[0].id, true);
+      return this.loadChargeResult(existing.rows[0].id, true);
     }
 
     const routeCostRule = await this.database.query<FeeRuleRow>(
@@ -526,7 +566,7 @@ export class PaymentsService {
       if (!duplicate.rows[0]) {
         throw new ConflictException("Unable to resolve idempotent payment.");
       }
-      return this.loadShadowResult(duplicate.rows[0].id, true);
+      return this.loadChargeResult(duplicate.rows[0].id, true);
     }
 
     const paymentIntentId = inserted.rows[0].id;
@@ -711,7 +751,7 @@ export class PaymentsService {
     };
   }
 
-  private async loadShadowResult(
+  private async loadChargeResult(
     paymentIntentId: string,
     idempotentReplay: boolean,
   ) {
