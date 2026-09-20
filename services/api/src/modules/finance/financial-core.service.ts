@@ -632,6 +632,229 @@ export class FinancialCoreService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  async confirmManualPayout(
+    payoutId: string,
+    adminAuthUserId: string,
+    input: {
+      externalReference?: unknown;
+      proof?: unknown;
+    },
+  ) {
+    return this.database.transaction(async (client) => {
+      const payoutResult = await client.query<{
+        id: string;
+        account_id: string;
+        wallet_id: string | null;
+        asset_id: string;
+        amount: string;
+        status: string;
+      }>(
+        `
+        select id,account_id,wallet_id,asset_id,amount::text,status
+        from controlplane.payout_requests
+        where id=$1::uuid
+        for update
+        `,
+        [payoutId],
+      );
+      const payout = payoutResult.rows[0];
+      if (!payout) throw new ConflictException("Payout request not found.");
+      if (payout.status === "CONFIRMED") {
+        return { success: true, data: { payoutId, status: "CONFIRMED" } };
+      }
+      if (!["APPROVAL_REQUIRED","APPROVED","PROCESSING","PAID"].includes(payout.status)) {
+        throw new ConflictException("Payout cannot be confirmed from its current status.");
+      }
+      if (!payout.wallet_id) throw new ConflictException("Payout wallet is missing.");
+
+      const customerLedgerId = await this.ensureLedgerAccount(client, {
+        code: `CUSTOMER:${payout.account_id}:BRL`,
+        type: "CUSTOMER",
+        ownerAccountId: payout.account_id,
+        assetId: payout.asset_id,
+        name: "Customer BRL",
+      });
+      const treasuryLedgerId = await this.ensureLedgerAccount(client, {
+        code: "TREASURY:PIX:PAYOUT:BRL",
+        type: "TREASURY",
+        assetId: payout.asset_id,
+        name: "PIX payout treasury",
+      });
+
+      const ledger = await client.query<{ id: string }>(
+        `
+        insert into public.ledger_transactions(
+          id,reference,type,status,idempotency_key,external_reference,metadata,
+          created_at,posted_at
+        )
+        values(
+          gen_random_uuid(),$1::varchar,'FIAT_WITHDRAWAL','POSTED',
+          $2::varchar,$3::varchar,$4::jsonb,now(),now()
+        )
+        on conflict (idempotency_key) do update
+        set reference=public.ledger_transactions.reference
+        returning id
+        `,
+        [
+          `PAYOUT:${payout.id}`,
+          `pixbrasil:payout:${payout.id}`,
+          String(input.externalReference ?? "").slice(0, 160) || null,
+          JSON.stringify({ payoutId: payout.id, confirmedBy: adminAuthUserId }),
+        ],
+      );
+
+      await client.query(
+        `
+        insert into public.ledger_entries(
+          id,ledger_transaction_id,ledger_account_id,asset_id,direction,amount,created_at
+        )
+        select gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,'DEBIT',$4::numeric,now()
+        where not exists (
+          select 1 from public.ledger_entries
+          where ledger_transaction_id=$1::uuid and ledger_account_id=$2::uuid
+        )
+        `,
+        [ledger.rows[0].id, customerLedgerId, payout.asset_id, payout.amount],
+      );
+      await client.query(
+        `
+        insert into public.ledger_entries(
+          id,ledger_transaction_id,ledger_account_id,asset_id,direction,amount,created_at
+        )
+        select gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,'CREDIT',$4::numeric,now()
+        where not exists (
+          select 1 from public.ledger_entries
+          where ledger_transaction_id=$1::uuid and ledger_account_id=$2::uuid
+        )
+        `,
+        [ledger.rows[0].id, treasuryLedgerId, payout.asset_id, payout.amount],
+      );
+
+      await client.query(
+        `
+        insert into public.transactions(
+          id,account_id,wallet_id,ledger_transaction_id,type,status,asset_id,
+          amount,provider_reference,idempotency_key,metadata,created_at,updated_at,completed_at
+        )
+        values(
+          gen_random_uuid(),$1::uuid,$2::uuid,$3::uuid,'FIAT_WITHDRAWAL','COMPLETED',$4::uuid,
+          $5::numeric,$6::varchar,$7::varchar,$8::jsonb,now(),now(),now()
+        )
+        on conflict (idempotency_key) do nothing
+        `,
+        [
+          payout.account_id,
+          payout.wallet_id,
+          ledger.rows[0].id,
+          payout.asset_id,
+          payout.amount,
+          String(input.externalReference ?? "").slice(0, 160) || null,
+          `pixbrasil:payout:${payout.id}`,
+          JSON.stringify({ payoutId: payout.id }),
+        ],
+      );
+
+      await client.query(
+        `
+        update public.wallet_balances
+        set reserved=greatest(0,reserved-$1::numeric),updated_at=now()
+        where wallet_id=$2::uuid
+        `,
+        [payout.amount, payout.wallet_id],
+      );
+
+      await client.query(
+        `
+        update controlplane.payout_requests
+        set status='CONFIRMED',
+            external_reference=coalesce(nullif($2::text,''),external_reference),
+            proof_metadata=proof_metadata || jsonb_build_object(
+              'manualProof',$3::jsonb,
+              'confirmedBy',$4::text,
+              'confirmedAt',now()
+            ),
+            approved_at=coalesce(approved_at,now()),
+            paid_at=coalesce(paid_at,now()),
+            confirmed_at=now(),
+            updated_at=now()
+        where id=$1::uuid
+        `,
+        [
+          payout.id,
+          String(input.externalReference ?? "").slice(0,160),
+          JSON.stringify(input.proof ?? {}),
+          adminAuthUserId,
+        ],
+      );
+
+      return { success: true, data: { payoutId: payout.id, status: "CONFIRMED" } };
+    });
+  }
+
+  async rejectManualPayout(
+    payoutId: string,
+    adminAuthUserId: string,
+    reasonValue: unknown,
+  ) {
+    return this.database.transaction(async (client) => {
+      const payoutResult = await client.query<{
+        id: string;
+        wallet_id: string | null;
+        amount: string;
+        status: string;
+      }>(
+        `
+        select id,wallet_id,amount::text,status
+        from controlplane.payout_requests
+        where id=$1::uuid
+        for update
+        `,
+        [payoutId],
+      );
+      const payout = payoutResult.rows[0];
+      if (!payout) throw new ConflictException("Payout request not found.");
+      if (payout.status === "REJECTED") {
+        return { success: true, data: { payoutId, status: "REJECTED" } };
+      }
+      if (!["DRAFT","APPROVAL_REQUIRED","APPROVED","PROCESSING"].includes(payout.status)) {
+        throw new ConflictException("Payout cannot be rejected from its current status.");
+      }
+      if (!payout.wallet_id) throw new ConflictException("Payout wallet is missing.");
+
+      await client.query(
+        `
+        update public.wallet_balances
+        set reserved=greatest(0,reserved-$1::numeric),
+            available=available+$1::numeric,
+            updated_at=now()
+        where wallet_id=$2::uuid
+        `,
+        [payout.amount, payout.wallet_id],
+      );
+
+      await client.query(
+        `
+        update controlplane.payout_requests
+        set status='REJECTED',
+            proof_metadata=proof_metadata || jsonb_build_object(
+              'rejectionReason',$2::text,
+              'rejectedBy',$3::text,
+              'rejectedAt',now()
+            ),
+            updated_at=now()
+        where id=$1::uuid
+        `,
+        [
+          payout.id,
+          String(reasonValue ?? "Rejected by operations").slice(0,500),
+          adminAuthUserId,
+        ],
+      );
+
+      return { success: true, data: { payoutId: payout.id, status: "REJECTED" } };
+    });
+  }
+
   private async ensureBrlWallet(
     client: PoolClient,
     accountId: string,
@@ -668,7 +891,7 @@ export class FinancialCoreService implements OnModuleInit, OnModuleDestroy {
     client: PoolClient,
     input: {
       code: string;
-      type: "CUSTOMER" | "PROVIDER" | "REVENUE";
+      type: "CUSTOMER" | "PROVIDER" | "REVENUE" | "TREASURY";
       ownerAccountId?: string;
       providerId?: string;
       assetId: string;
