@@ -93,26 +93,13 @@ export class WebhooksService {
       payload: redactedPayload,
     });
 
-    const payment = await this.applyVerifiedPaymentStatus(
-      connection.connection_id,
-      transactionId,
+    await this.processVerifiedPaymentEvent({
+      eventId: persisted.eventId,
+      connectionId: connection.connection_id,
+      providerPaymentId: transactionId,
       verifiedStatus,
-      "MISTICPAY",
-    );
-
-    if (payment && !persisted.replay) {
-      if (payment.status === "SUCCEEDED") {
-        await this.financialCore.finalizeSuccessfulPayment(
-          payment.paymentIntentId,
-          payment.providerCode,
-          payment.providerPaymentId,
-        );
-      }
-      await this.merchantWebhooks.deliverPaymentEvent(
-        this.toMerchantEventType(payment.status),
-        payment,
-      );
-    }
+      providerCode: "MISTICPAY",
+    });
 
     return {
       success: true,
@@ -211,26 +198,13 @@ export class WebhooksService {
       payload: redactedPayload,
     });
 
-    const payment = await this.applyVerifiedPaymentStatus(
-      connection.connection_id,
-      paymentId,
+    await this.processVerifiedPaymentEvent({
+      eventId: persisted.eventId,
+      connectionId: connection.connection_id,
+      providerPaymentId: paymentId,
       verifiedStatus,
-      "PIXGO",
-    );
-
-    if (payment && !persisted.replay) {
-      if (payment.status === "SUCCEEDED") {
-        await this.financialCore.finalizeSuccessfulPayment(
-          payment.paymentIntentId,
-          payment.providerCode,
-          payment.providerPaymentId,
-        );
-      }
-      await this.merchantWebhooks.deliverPaymentEvent(
-        this.toMerchantEventType(payment.status),
-        payment,
-      );
-    }
+      providerCode: "PIXGO",
+    });
 
     return {
       success: true,
@@ -304,8 +278,8 @@ export class WebhooksService {
         processed_at
       )
       values(
-        $1::uuid,$2::text,$3::text,'PROCESSED',
-        $4::text,$5::jsonb,now(),now()
+        $1::uuid,$2::text,$3::text,'RECEIVED',
+        $4::text,$5::jsonb,now(),null
       )
       on conflict (gateway_connection_id,provider_event_key)
       do nothing
@@ -320,7 +294,106 @@ export class WebhooksService {
       ],
     );
 
-    return { replay: !inserted.rows[0] };
+    if (inserted.rows[0]) {
+      return {
+        eventId: inserted.rows[0].id,
+        replay: false,
+      };
+    }
+
+    const existing = await this.database.query<{ id: string }>(
+      `
+      select id
+      from pixbrasil.provider_webhook_events
+      where gateway_connection_id=$1::uuid
+        and provider_event_key=$2::text
+      limit 1
+      `,
+      [input.connectionId, input.eventKey],
+    );
+
+    if (!existing.rows[0]) {
+      throw new ServiceUnavailableException(
+        "Unable to resolve persisted provider webhook event.",
+      );
+    }
+
+    return {
+      eventId: existing.rows[0].id,
+      replay: true,
+    };
+  }
+
+  private async processVerifiedPaymentEvent(input: {
+    eventId: string;
+    connectionId: string;
+    providerPaymentId: string;
+    verifiedStatus: NormalizedProviderStatus;
+    providerCode: string;
+  }) {
+    await this.database.query(
+      `
+      update pixbrasil.provider_webhook_events
+      set status='PROCESSING',processed_at=null
+      where id=$1::uuid
+      `,
+      [input.eventId],
+    );
+
+    try {
+      const payment = await this.applyVerifiedPaymentStatus(
+        input.connectionId,
+        input.providerPaymentId,
+        input.verifiedStatus,
+        input.providerCode,
+      );
+
+      if (!payment) {
+        await this.database.query(
+          `
+          update pixbrasil.provider_webhook_events
+          set status='IGNORED',processed_at=now()
+          where id=$1::uuid
+          `,
+          [input.eventId],
+        );
+        return null;
+      }
+
+      if (payment.status === "SUCCEEDED") {
+        await this.financialCore.finalizeSuccessfulPayment(
+          payment.paymentIntentId,
+          payment.providerCode,
+          payment.providerPaymentId,
+        );
+      }
+
+      await this.merchantWebhooks.deliverPaymentEvent(
+        this.toMerchantEventType(payment.status),
+        payment,
+      );
+
+      await this.database.query(
+        `
+        update pixbrasil.provider_webhook_events
+        set status='PROCESSED',processed_at=now()
+        where id=$1::uuid
+        `,
+        [input.eventId],
+      );
+
+      return payment;
+    } catch (error) {
+      await this.database.query(
+        `
+        update pixbrasil.provider_webhook_events
+        set status='FAILED',processed_at=now()
+        where id=$1::uuid
+        `,
+        [input.eventId],
+      );
+      throw error;
+    }
   }
 
   private async applyVerifiedPaymentStatus(
