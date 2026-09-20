@@ -11,8 +11,7 @@ import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import type { MerchantApiContext } from "../merchant-auth/merchant-auth.types";
 import { RoutingEngineService } from "../routing/routing-engine.service";
-import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
-import { executeProviderAttempt } from "./provider-execution";
+import { PaymentLiveExecutionService } from "./payment-live-execution.service";
 import type {
   RouteCandidate,
   RoutingStrategy,
@@ -153,7 +152,7 @@ export class PaymentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly routing: RoutingEngineService,
-    private readonly providers: ProviderAdapterRegistry,
+    private readonly liveExecution: PaymentLiveExecutionService,
   ) {}
 
   async getPayment(
