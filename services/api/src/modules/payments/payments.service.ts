@@ -611,11 +611,36 @@ export class PaymentsService {
           (row) => row.connection_id === selected.connectionId,
         )
       : undefined;
-    const routingFlag = await this.database.query<{ enabled: boolean }>(
-      `select enabled from controlplane.feature_flags where key='routing_enforcement' limit 1`,
+    const flags = await this.database.query<{
+      key: string;
+      enabled: boolean;
+      config: Record<string, unknown>;
+    }>(
+      `
+      select key,enabled,config
+      from controlplane.feature_flags
+      where key in ('routing_enforcement','live_payment_execution')
+      `,
     );
+    const routingFlag = flags.rows.find(
+      (row) => row.key === "routing_enforcement",
+    );
+    const liveFlag = flags.rows.find(
+      (row) => row.key === "live_payment_execution",
+    );
+    const allowedMerchantIds = Array.isArray(liveFlag?.config?.merchantIds)
+      ? liveFlag.config.merchantIds.map(String)
+      : [];
+    const allowedStoreCodes = Array.isArray(liveFlag?.config?.storeCodes)
+      ? liveFlag.config.storeCodes.map((value) => String(value).toUpperCase())
+      : [];
+    const liveAllowlisted =
+      Boolean(liveFlag?.enabled) &&
+      allowedMerchantIds.includes(merchant.merchantId) &&
+      allowedStoreCodes.includes(config.store_code.toUpperCase());
     const liveExecution =
-      Boolean(routingFlag.rows[0]?.enabled) &&
+      Boolean(routingFlag?.enabled) &&
+      liveAllowlisted &&
       config.activation_mode === "ENFORCED";
     const outcome = selected
       ? liveExecution
@@ -659,6 +684,7 @@ export class PaymentsService {
           releaseClass: config.release_class,
           platformFeeProfile: config.fee_profile_code,
           crossReleaseClassFailover: false,
+          liveAllowlisted,
         }),
         outcome,
       ],
