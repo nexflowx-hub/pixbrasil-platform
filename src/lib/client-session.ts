@@ -144,18 +144,21 @@ async function accessToken() {
   return store.get(ACCESS_COOKIE)?.value ?? null;
 }
 
-export async function clientCoreFetch(path: string) {
+export async function clientCoreFetch(path: string, init: RequestInit = {}) {
   let token = await accessToken();
   if (!token) return new Response(null, { status: 401 });
 
-  const request = (value: string) =>
-    fetch(CORE_API_URL + path, {
-      headers: {
-        Accept: "application/json",
-        Authorization: "Bearer " + value,
-      },
+  const request = (value: string) => {
+    const headers = new Headers(init.headers);
+    headers.set("Accept", "application/json");
+    headers.set("Authorization", "Bearer " + value);
+
+    return fetch(CORE_API_URL + path, {
+      ...init,
+      headers,
       cache: "no-store",
     });
+  };
 
   let response = await request(token);
   if (response.status === 401) {
