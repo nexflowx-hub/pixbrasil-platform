@@ -43,8 +43,7 @@ export class FinancialCoreService {
           coalesce(rr.available_after_minutes,rr.max_release_minutes,0) release_minutes,
           customer_la.id customer_ledger_id,
           clearing_la.id clearing_ledger_id,
-          revenue_la.id revenue_ledger_id,
-          expense_la.id expense_ledger_id
+          revenue_la.id revenue_ledger_id
         from pixbrasil.payment_intents pi
         join pixbrasil.store_financial_profiles sfp on sfp.store_id=pi.store_id
         join pixbrasil.release_rules rr
@@ -57,7 +56,6 @@ export class FinancialCoreService {
           on customer_la.code='CUSTOMER:' || pi.account_id::text || ':BRL'
         join public.ledger_accounts clearing_la on clearing_la.code='CLEARING:PIX:BRL'
         join public.ledger_accounts revenue_la on revenue_la.code='REVENUE:PIXBRASIL:BRL'
-        join public.ledger_accounts expense_la on expense_la.code='EXPENSE:PIX_PROVIDER:BRL'
         where pi.id=$1::uuid
         limit 1
       ),
@@ -126,11 +124,6 @@ export class FinancialCoreService {
                'DEBIT'::"LedgerEntryDirection",p.cash_received_brl,current_timestamp
         from priced p join new_settlement ns on true join new_ledger_tx lt on true
         where p.cash_received_brl>0
-        union all
-        select gen_random_uuid(),lt.id,p.expense_ledger_id,p.asset_id,
-               'DEBIT'::"LedgerEntryDirection",p.provider_fee_brl,current_timestamp
-        from priced p join new_settlement ns on true join new_ledger_tx lt on true
-        where p.provider_fee_brl>0
         union all
         select gen_random_uuid(),lt.id,p.customer_ledger_id,p.asset_id,
                'CREDIT'::"LedgerEntryDirection",p.net_brl,current_timestamp
