@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { OperationalPage } from "@/components/operational-page";
 import { PayoutControl } from "@/components/payout-control";
+import { SettlementControl } from "@/components/settlement-control";
 import { ModulePlaceholder } from "@/components/module-placeholder";
 
 const operational = new Set([
@@ -33,6 +34,10 @@ export default async function ModulePage({
 
   if (module === "payouts") {
     return <PayoutControl />;
+  }
+
+  if (module === "settlements") {
+    return <SettlementControl />;
   }
 
   if (operational.has(module)) {
