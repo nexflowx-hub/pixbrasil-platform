@@ -1,10 +1,26 @@
 import {
+  BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import type { ClientContext } from "../client-auth/client-auth.types";
 import { DatabaseService } from "../database/database.service";
+
+function maskDestination(value: string) {
+  if (value.length <= 6) return "***";
+  return value.slice(0, 3) + "***" + value.slice(-3);
+}
+
+function normalizePixKeyType(value: unknown) {
+  const parsed = String(value ?? "").trim().toUpperCase();
+  const allowed = ["CPF", "CNPJ", "EMAIL", "TELEFONE", "CHAVE_ALEATORIA"];
+  if (!allowed.includes(parsed)) {
+    throw new BadRequestException("pixKeyType is invalid.");
+  }
+  return parsed;
+}
 
 @Injectable()
 export class ClientService {
@@ -287,4 +303,220 @@ export class ClientService {
       },
     };
   }
+
+  async listPayouts(context: ClientContext, accountId: string) {
+    const access = context.accounts.find((item) => item.accountId === accountId);
+    if (!access) throw new ForbiddenException("Account access is not granted.");
+
+    const result = await this.database.query(
+      `
+      select
+        pr.id,
+        pr.amount::text,
+        ass.code asset_code,
+        pr.destination_type,
+        pr.destination_snapshot,
+        pr.status,
+        pr.external_reference,
+        pr.created_at::text,
+        pr.approved_at::text,
+        pr.paid_at::text,
+        pr.confirmed_at::text
+      from controlplane.payout_requests pr
+      join public.assets ass on ass.id=pr.asset_id
+      where pr.account_id=$1::uuid
+      order by pr.created_at desc
+      limit 100
+      `,
+      [accountId],
+    );
+
+    return { success: true, data: result.rows };
+  }
+
+  async requestPayout(
+    context: ClientContext,
+    accountId: string,
+    body: Record<string, unknown>,
+  ) {
+    const access = context.accounts.find((item) => item.accountId === accountId);
+    if (!access) throw new ForbiddenException("Account access is not granted.");
+    if (!["OWNER", "ADMIN", "FINANCE"].includes(access.role)) {
+      throw new ForbiddenException("This role cannot request payouts.");
+    }
+
+    const flag = await this.database.query<{ enabled: boolean }>(
+      `select enabled from controlplane.feature_flags where key='manual_payouts' limit 1`,
+    );
+    if (!flag.rows[0]?.enabled) {
+      throw new ConflictException("Payout requests are temporarily unavailable.");
+    }
+
+    const amount = Math.round(Number(body.amount) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("amount must be a positive BRL value.");
+    }
+
+    const pixKey = String(body.pixKey ?? "").trim();
+    if (!pixKey || pixKey.length > 180) {
+      throw new BadRequestException("pixKey is required.");
+    }
+    const pixKeyType = normalizePixKeyType(body.pixKeyType);
+    const maskedKey = maskDestination(pixKey);
+
+    const result = await this.database.query<{
+      id: string;
+      amount: string;
+      status: string;
+      created_at: string;
+    }>(
+      `
+      with asset as (
+        select id from public.assets where code='BRL' limit 1
+      ),
+      wallet as (
+        select w.id,w.account_id,w.asset_id
+        from public.wallets w
+        join asset a on a.id=w.asset_id
+        where w.account_id=$1::uuid and w.status='ACTIVE'
+        limit 1
+      ),
+      reserved as (
+        update public.wallet_balances wb
+        set available=wb.available-$2::numeric,
+            reserved=wb.reserved+$2::numeric,
+            updated_at=current_timestamp
+        from wallet w
+        where wb.wallet_id=w.id
+          and wb.available >= $2::numeric
+        returning wb.wallet_id
+      ),
+      secret as (
+        select vault.create_secret(
+          jsonb_build_object(
+            'pixKey',$3::text,
+            'pixKeyType',$4::text
+          )::text,
+          'pixbrasil-payout-' || gen_random_uuid()::text,
+          'PiXBrasil payout destination'
+        )::uuid id
+        where exists(select 1 from reserved)
+      ),
+      inserted as (
+        insert into controlplane.payout_requests(
+          id,account_id,wallet_id,asset_id,amount,destination_type,
+          destination_snapshot,destination_vault_secret_id,status,
+          proof_metadata,requested_by,created_at,updated_at
+        )
+        select
+          gen_random_uuid(),$1::uuid,w.id,w.asset_id,$2::numeric,'PIX',
+          jsonb_build_object(
+            'pixKeyType',$4::text,
+            'pixKeyMasked',$5::text
+          ),
+          s.id,
+          'APPROVAL_REQUIRED',
+          jsonb_build_object(
+            'channel','TELEGRAM_MANUAL',
+            'mode','MANUAL_TICKET',
+            'requestedFrom','CLIENT_PORTAL'
+          ),
+          $6::uuid,now(),now()
+        from wallet w,secret s
+        where exists(select 1 from reserved)
+        returning id,amount,status,created_at
+      )
+      select id,amount::text,status,created_at::text from inserted
+      `,
+      [
+        accountId,
+        amount,
+        pixKey,
+        pixKeyType,
+        maskedKey,
+        context.authUserId,
+      ],
+    );
+
+    const payout = result.rows[0];
+    if (!payout) {
+      throw new ConflictException("Insufficient available BRL balance.");
+    }
+
+    const telegram = await this.notifyPayoutTelegram({
+      payoutId: payout.id,
+      amount,
+      accountId,
+      email: context.email ?? null,
+      pixKeyType,
+      maskedKey,
+    });
+
+    return {
+      success: true,
+      data: {
+        payoutId: payout.id,
+        amount,
+        currency: "BRL",
+        status: payout.status,
+        destination: { type: pixKeyType, masked: maskedKey },
+        ticket: {
+          channel: "TELEGRAM_MANUAL",
+          notificationDelivered: telegram,
+        },
+        createdAt: payout.created_at,
+      },
+    };
+  }
+
+  private async notifyPayoutTelegram(input: {
+    payoutId: string;
+    amount: number;
+    accountId: string;
+    email: string | null;
+    pixKeyType: string;
+    maskedKey: string;
+  }) {
+    const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
+    const chatId = process.env.TELEGRAM_PAYOUT_CHAT_ID?.trim();
+    if (!token || !chatId) return false;
+
+    const amount = new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(input.amount);
+
+    const text = [
+      "💸 PiXBrasil · Novo payout manual",
+      "",
+      "Ticket: " + input.payoutId,
+      "Conta: " + input.accountId,
+      "Utilizador: " + (input.email ?? "—"),
+      "Valor: " + amount,
+      "Destino: " + input.pixKeyType + " · " + input.maskedKey,
+      "",
+      "Abrir Control Plane:",
+      "https://admin.pixbrasil.org/payouts",
+    ].join("\n");
+
+    try {
+      const response = await fetch(
+        "https://api.telegram.org/bot" + token + "/sendMessage",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text,
+            disable_web_page_preview: true,
+          }),
+          signal: AbortSignal.timeout(5_000),
+        },
+      );
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
 }
