@@ -40,7 +40,7 @@ export function DocsShell({
           </Link>
           <div className="flex items-center gap-3">
             <span className="hidden rounded-full border border-[#20F29A]/16 bg-[#20F29A]/5 px-3 py-1.5 text-[8px] font-bold uppercase tracking-[.14em] text-[#71D2B3] sm:inline-flex">
-              Docs v1 · MVP controlado
+              Docs v1 · Production
             </span>
             <Link
               href="/login"
