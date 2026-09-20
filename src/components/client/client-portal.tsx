@@ -116,8 +116,42 @@ export function ClientPortal() {
 
   useEffect(() => {
     if (!accountId) return;
-    void loadOverview(accountId);
-  }, [accountId, loadOverview]);
+    let active = true;
+
+    fetch(
+      "/api/client/accounts/" + encodeURIComponent(accountId) + "/overview",
+      { cache: "no-store" },
+    )
+      .then(async (response) => {
+        if (response.status === 401) {
+          router.replace("/login");
+          return null;
+        }
+        const payload = (await response.json()) as OverviewPayload;
+        if (!response.ok) {
+          throw new Error("Não foi possível carregar a conta.");
+        }
+        return payload.data;
+      })
+      .then((data) => {
+        if (!active || !data) return;
+        setOverview(data);
+        setError("");
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(
+          cause instanceof Error ? cause.message : "Falha ao carregar conta.",
+        );
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [accountId, router]);
 
   const activeAccount = useMemo(
     () => session?.accounts.find((account) => account.accountId === accountId),
