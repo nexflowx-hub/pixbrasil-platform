@@ -31,8 +31,9 @@ export const SITE_URL = normalizeSiteUrl(
 export const siteConfig = {
   name: "PiXBrasil.org",
   shortName: "PiXBrasil",
-  tagline: "Seu dinheiro sem fronteiras",
+  tagline: "PIX, routing e Wallet BRL em uma única operação",
   description:
-    "Receba via PIX, mantenha seus recursos em ativos digitais e escolha como utilizar ou sacar. Soluções para pessoas e empresas.",
+    "Infraestrutura financeira brasileira para PIX, routing multi-provider, Wallet BRL, liberações, webhooks e operação Personal e Business.",
   locale: "pt-BR",
+  release: "0.6.0",
 } as const;
