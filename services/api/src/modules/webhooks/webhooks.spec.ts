@@ -46,10 +46,17 @@ test("MisticPay webhook is S2S verified and stored without payer PII", async () 
     },
   };
 
+  const financial = {
+    async recordSuccessfulPayment() {
+      return { posted: true };
+    },
+  };
+
   const service = new WebhooksService(
     database as never,
     providers as never,
     merchantWebhooks as never,
+    financial as never,
   );
 
   const result = await service.handleMisticPay(
