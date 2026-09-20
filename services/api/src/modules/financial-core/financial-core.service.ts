@@ -334,4 +334,185 @@ export class FinancialCoreService {
     );
     return result.rows[0]?.released_count ?? 0;
   }
+
+  async setPayoutProcessing(payoutId: string, externalReference?: string) {
+    const result = await this.database.query<{ id: string; status: string }>(
+      `
+      update controlplane.payout_requests
+      set status='PROCESSING',
+          external_reference=coalesce(nullif($2::text,''),external_reference),
+          approved_at=coalesce(approved_at,now()),
+          updated_at=now()
+      where id=$1::uuid
+        and status in ('APPROVAL_REQUIRED','APPROVED','PROCESSING')
+      returning id,status
+      `,
+      [payoutId, externalReference ?? ""],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async markPayoutPaid(
+    payoutId: string,
+    externalReference: string,
+    proofMetadata: Record<string, unknown>,
+  ) {
+    const result = await this.database.query<{
+      id: string;
+      status: string;
+      amount: string;
+    }>(
+      `
+      with source as (
+        select
+          pr.id,
+          pr.account_id,
+          pr.wallet_id,
+          pr.asset_id,
+          pr.amount,
+          customer_la.id customer_ledger_id,
+          clearing_la.id clearing_ledger_id
+        from controlplane.payout_requests pr
+        join public.ledger_accounts customer_la
+          on customer_la.code='CUSTOMER:' || pr.account_id::text || ':BRL'
+        join public.ledger_accounts clearing_la
+          on clearing_la.code='CLEARING:PIX:BRL'
+        where pr.id=$1::uuid
+          and pr.status in ('APPROVAL_REQUIRED','APPROVED','PROCESSING')
+        limit 1
+      ),
+      wallet_update as (
+        update public.wallet_balances wb
+        set reserved=wb.reserved-s.amount,
+            updated_at=current_timestamp
+        from source s
+        where wb.wallet_id=s.wallet_id
+          and wb.reserved>=s.amount
+        returning wb.wallet_id
+      ),
+      ledger_tx as (
+        insert into public.ledger_transactions(
+          id,reference,type,status,idempotency_key,external_reference,metadata,
+          created_at,posted_at
+        )
+        select
+          gen_random_uuid(),
+          'PAYOUT:' || s.id::text,
+          'FIAT_WITHDRAWAL'::"LedgerTransactionType",
+          'POSTED'::"LedgerTransactionStatus",
+          'pixbrasil:payout:' || s.id::text,
+          $2::varchar,
+          jsonb_build_object('payoutId',s.id,'channel','MANUAL_TICKET'),
+          current_timestamp,current_timestamp
+        from source s
+        where exists(select 1 from wallet_update)
+        on conflict (idempotency_key) do nothing
+        returning id
+      ),
+      ledger_entries_insert as (
+        insert into public.ledger_entries(
+          id,ledger_transaction_id,ledger_account_id,asset_id,direction,amount,created_at
+        )
+        select
+          gen_random_uuid(),lt.id,s.customer_ledger_id,s.asset_id,
+          'DEBIT'::"LedgerEntryDirection",s.amount,current_timestamp
+        from source s,ledger_tx lt
+        union all
+        select
+          gen_random_uuid(),lt.id,s.clearing_ledger_id,s.asset_id,
+          'CREDIT'::"LedgerEntryDirection",s.amount,current_timestamp
+        from source s,ledger_tx lt
+        returning id
+      ),
+      tx_insert as (
+        insert into public.transactions(
+          id,account_id,wallet_id,ledger_transaction_id,provider_id,type,status,
+          asset_id,amount,fee_asset_id,fee_amount,provider_reference,idempotency_key,
+          metadata,created_at,updated_at,completed_at
+        )
+        select
+          gen_random_uuid(),s.account_id,s.wallet_id,lt.id,null,
+          'FIAT_WITHDRAWAL'::"TransactionType",'COMPLETED'::"TransactionStatus",
+          s.asset_id,s.amount,null,null,$2::varchar,
+          'pixbrasil:payout-tx:' || s.id::text,
+          jsonb_build_object('payoutId',s.id,'channel','MANUAL_TICKET'),
+          current_timestamp,current_timestamp,current_timestamp
+        from source s,ledger_tx lt
+        on conflict (idempotency_key) do nothing
+        returning id
+      ),
+      payout_update as (
+        update controlplane.payout_requests pr
+        set status='PAID',
+            external_reference=$2::varchar,
+            proof_metadata=coalesce(pr.proof_metadata,'{}'::jsonb) || $3::jsonb,
+            approved_at=coalesce(pr.approved_at,now()),
+            paid_at=coalesce(pr.paid_at,now()),
+            updated_at=now()
+        where pr.id=$1::uuid
+          and exists(select 1 from wallet_update)
+          and (
+            exists(select 1 from ledger_tx)
+            or exists(
+              select 1 from public.ledger_transactions lt0
+              where lt0.idempotency_key='pixbrasil:payout:' || pr.id::text
+            )
+          )
+        returning pr.id,pr.status,pr.amount
+      )
+      select id,status,amount::text from payout_update
+      `,
+      [payoutId, externalReference.slice(0, 200), JSON.stringify(proofMetadata)],
+    );
+
+    return result.rows[0] ?? null;
+  }
+
+  async confirmPayout(payoutId: string) {
+    const result = await this.database.query<{ id: string; status: string }>(
+      `
+      update controlplane.payout_requests
+      set status='CONFIRMED',
+          confirmed_at=coalesce(confirmed_at,now()),
+          updated_at=now()
+      where id=$1::uuid and status in ('PAID','CONFIRMED')
+      returning id,status
+      `,
+      [payoutId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async cancelPayout(payoutId: string, status: "REJECTED" | "CANCELED" | "FAILED") {
+    const result = await this.database.query<{ id: string; status: string }>(
+      `
+      with source as (
+        select id,wallet_id,amount
+        from controlplane.payout_requests
+        where id=$1::uuid
+          and status in ('APPROVAL_REQUIRED','APPROVED','PROCESSING')
+        limit 1
+      ),
+      wallet_update as (
+        update public.wallet_balances wb
+        set reserved=wb.reserved-s.amount,
+            available=wb.available+s.amount,
+            updated_at=current_timestamp
+        from source s
+        where wb.wallet_id=s.wallet_id
+          and wb.reserved>=s.amount
+        returning wb.wallet_id
+      )
+      update controlplane.payout_requests pr
+      set status=$2::varchar,
+          updated_at=now()
+      where pr.id=$1::uuid
+        and exists(select 1 from wallet_update)
+      returning pr.id,pr.status
+      `,
+      [payoutId, status],
+    );
+    return result.rows[0] ?? null;
+  }
+
 }
