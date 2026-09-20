@@ -56,7 +56,6 @@ export function ClientPortal() {
   const loadOverview = useCallback(
     async (id: string) => {
       if (!id) return;
-      setError("");
       try {
         const response = await fetch(
           "/api/client/accounts/" + encodeURIComponent(id) + "/overview",
@@ -71,6 +70,7 @@ export function ClientPortal() {
           throw new Error("Não foi possível carregar a conta.");
         }
         setOverview(payload.data);
+        setError("");
       } catch (cause) {
         setError(
           cause instanceof Error ? cause.message : "Falha ao carregar conta.",
