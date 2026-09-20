@@ -4,11 +4,15 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import { DatabaseService } from "../database/database.service";
 import type { MerchantApiContext } from "../merchant-auth/merchant-auth.types";
 import { RoutingEngineService } from "../routing/routing-engine.service";
+import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
+import { executeProviderAttempt } from "./provider-execution";
 import type {
   RouteCandidate,
   RoutingStrategy,
@@ -149,6 +153,7 @@ export class PaymentsService {
   constructor(
     private readonly database: DatabaseService,
     private readonly routing: RoutingEngineService,
+    private readonly providers: ProviderAdapterRegistry,
   ) {}
 
   async getPayment(
@@ -258,7 +263,7 @@ export class PaymentsService {
     };
   }
 
-  async createShadowCharge(
+  async createCharge(
     merchant: MerchantApiContext,
     idempotencyKeyValue: string | undefined,
     input: ChargeInput,
@@ -386,7 +391,7 @@ export class PaymentsService {
           "Idempotency-Key was already used with a different payment payload.",
         );
       }
-      return this.loadShadowResult(existing.rows[0].id, true);
+      return this.loadPaymentResult(existing.rows[0].id, true);
     }
 
     const routeCostRule = await this.database.query<FeeRuleRow>(
@@ -526,7 +531,7 @@ export class PaymentsService {
       if (!duplicate.rows[0]) {
         throw new ConflictException("Unable to resolve idempotent payment.");
       }
-      return this.loadShadowResult(duplicate.rows[0].id, true);
+      return this.loadPaymentResult(duplicate.rows[0].id, true);
     }
 
     const paymentIntentId = inserted.rows[0].id;
@@ -711,7 +716,7 @@ export class PaymentsService {
     };
   }
 
-  private async loadShadowResult(
+  private async loadPaymentResult(
     paymentIntentId: string,
     idempotentReplay: boolean,
   ) {
