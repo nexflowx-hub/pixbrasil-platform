@@ -145,6 +145,20 @@ export class AdminController {
     return this.admin.payoutsOverview();
   }
 
+  @Post("payouts/:payoutId/status")
+  @RequirePermissions("payouts.confirm")
+  updatePayoutStatus(
+    @Param("payoutId") payoutId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: AdminRequest,
+  ) {
+    return this.admin.updatePayoutStatus(
+      payoutId,
+      body,
+      request.adminContext!,
+    );
+  }
+
   @Get("users")
   @RequirePermissions("users.read")
   users() {
