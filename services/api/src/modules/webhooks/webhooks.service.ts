@@ -220,6 +220,14 @@ export class WebhooksService {
     );
 
     if (payment && !persisted.replay) {
+      if (payment.status === "SUCCEEDED") {
+        await this.financial.recordSuccessfulPayment({
+          paymentIntentId: payment.paymentIntentId,
+          providerPaymentId: payment.providerPaymentId,
+          providerCode: payment.providerCode,
+        });
+      }
+
       await this.merchantWebhooks.deliverPaymentEvent(
         this.toMerchantEventType(payment.status),
         payment,
