@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { OperationalPage } from "@/components/operational-page";
+import { PayoutControl } from "@/components/payout-control";
 import { ModulePlaceholder } from "@/components/module-placeholder";
 
 const operational = new Set([
@@ -29,6 +30,10 @@ export default async function ModulePage({
   params: Promise<{ module: string }>;
 }) {
   const { module } = await params;
+
+  if (module === "payouts") {
+    return <PayoutControl />;
+  }
 
   if (operational.has(module)) {
     return <OperationalPage kind={module as
