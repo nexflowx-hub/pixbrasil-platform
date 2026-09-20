@@ -163,7 +163,7 @@
         },
         "responses": {
           "200": {
-            "description": "PaymentIntent resolved. Stores in SHADOW return SHADOW_ONLY and do not create a real PIX."
+            "description": "PaymentIntent resolved. Production Stores return the provider PIX action when payment creation succeeds."
           },
           "400": {
             "description": "Invalid request."
