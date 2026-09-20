@@ -259,6 +259,10 @@ export class ClientService {
       throw new NotFoundException("Account not found.");
     }
 
+    if (account.status === "ACTIVE") {
+      await this.financial.ensureAccountFoundation(accountId);
+    }
+
     const walletResult = await this.database.query<{
       wallet_id: string;
       wallet_status: string;
@@ -336,6 +340,13 @@ export class ClientService {
     );
 
     let business: Record<string, unknown> | null = null;
+    let capabilities = {
+      financialWritesEnabled: false,
+      pixCollectionEnabled: false,
+      payoutTicketsEnabled: false,
+      exchangeEnabled: false,
+      note: "Account operational state is determined by product and routing configuration.",
+    };
 
     if (account.type === "BUSINESS") {
       const merchantResult = await this.database.query<{
@@ -355,73 +366,219 @@ export class ClientService {
 
       const merchant = merchantResult.rows[0];
       if (merchant) {
-        const stores = await this.database.query(
-          `
-          select
-            s.id,
-            s.code,
-            s.name,
-            s.status,
-            s.currency,
-            gc.alias as gateway_alias,
-            p.code as provider_code,
-            rel.code as release_profile,
-            rel.release_class,
-            rcp.code as route_cost_profile,
-            rp.activation_mode as routing_mode
-          from pixbrasil.stores s
-          left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
-          left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
-          left join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
-          left join lateral (
-            select *
-            from pixbrasil.routing_policies rp0
-            where rp0.store_id=s.id and rp0.status='ACTIVE'
-            order by rp0.priority asc,rp0.version desc
-            limit 1
-          ) rp on true
-          left join lateral (
-            select gc0.*,p0.code as provider_code
-            from pixbrasil.routing_routes rr0
-            join pixbrasil.gateway_connections gc0 on gc0.id=rr0.gateway_connection_id
-            join public.providers p0 on p0.id=gc0.provider_id
-            where rr0.policy_id=rp.id and rr0.enabled=true
-            order by rr0.priority asc
-            limit 1
-          ) route on true
-          left join pixbrasil.gateway_connections gc on gc.id=route.id
-          left join public.providers p on p.id=gc.provider_id
-          where s.merchant_id=$1::uuid
-          order by s.code
-          `,
-          [merchant.merchant_id],
+        const [
+          stores,
+          payments,
+          payouts,
+          flow,
+          flags,
+        ] = await Promise.all([
+          this.database.query(
+            `
+            select
+              s.id,
+              s.code,
+              s.name,
+              s.status,
+              s.currency,
+              gc.alias as gateway_alias,
+              p.code as provider_code,
+              coalesce(gc.metadata->>'lastConnectionHealth','UNKNOWN') as provider_health,
+              nullif(gc.metadata->>'lastConnectionLatencyMs','')::int as provider_latency_ms,
+              rel.code as release_profile,
+              rel.release_class,
+              rcp.code as route_cost_profile,
+              rp.activation_mode as routing_mode,
+              coalesce(sum(st.net_brl) filter (where st.status='AVAILABLE'),0)::text as available_brl,
+              coalesce(sum(st.net_brl) filter (where st.status='PENDING'),0)::text as pending_brl,
+              coalesce(sum(st.net_brl) filter (where st.status='RESERVED'),0)::text as reserved_brl,
+              min(st.available_at) filter (where st.status='PENDING')::text as next_available_at,
+              count(distinct pi.id)::int as payment_count,
+              count(distinct pi.id) filter (where pi.status='SUCCEEDED')::int as succeeded_count
+            from pixbrasil.stores s
+            left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
+            left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
+            left join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
+            left join lateral (
+              select *
+              from pixbrasil.routing_policies rp0
+              where rp0.store_id=s.id and rp0.status='ACTIVE'
+              order by rp0.priority asc,rp0.version desc
+              limit 1
+            ) rp on true
+            left join lateral (
+              select gc0.*
+              from pixbrasil.routing_routes rr0
+              join pixbrasil.gateway_connections gc0 on gc0.id=rr0.gateway_connection_id
+              where rr0.policy_id=rp.id and rr0.enabled=true
+              order by rr0.priority asc
+              limit 1
+            ) gc on true
+            left join public.providers p on p.id=gc.provider_id
+            left join pixbrasil.payment_intents pi on pi.store_id=s.id
+            left join pixbrasil.settlements st on st.payment_intent_id=pi.id
+            where s.merchant_id=$1::uuid
+            group by
+              s.id,s.code,s.name,s.status,s.currency,
+              gc.alias,p.code,gc.metadata,
+              rel.code,rel.release_class,rcp.code,rp.activation_mode
+            order by s.code
+            `,
+            [merchant.merchant_id],
+          ),
+          this.database.query(
+            `
+            select
+              pi.id,
+              pi.external_reference,
+              pi.amount::text,
+              pi.currency,
+              pi.status,
+              pi.payment_method,
+              s.code as store_code,
+              p.code as provider_code,
+              gc.alias as gateway_alias,
+              pa.provider_payment_id,
+              st.net_brl::text as net_brl,
+              st.status as settlement_status,
+              st.available_at::text,
+              pi.created_at::text,
+              pi.updated_at::text,
+              pi.completed_at::text
+            from pixbrasil.payment_intents pi
+            left join pixbrasil.stores s on s.id=pi.store_id
+            left join lateral (
+              select pa0.*
+              from pixbrasil.provider_attempts pa0
+              where pa0.payment_intent_id=pi.id
+              order by pa0.attempt_no desc
+              limit 1
+            ) pa on true
+            left join pixbrasil.gateway_connections gc
+              on gc.id=coalesce(pa.gateway_connection_id,pi.selected_connection_id)
+            left join public.providers p on p.id=gc.provider_id
+            left join pixbrasil.settlements st on st.payment_intent_id=pi.id
+            where pi.merchant_id=$1::uuid
+            order by pi.created_at desc
+            limit 50
+            `,
+            [merchant.merchant_id],
+          ),
+          this.database.query(
+            `
+            select
+              pr.id,
+              pr.external_reference,
+              pr.amount::text,
+              a.code as asset_code,
+              pr.destination_type,
+              pr.status,
+              pr.created_at::text,
+              pr.approved_at::text,
+              pr.paid_at::text,
+              pr.confirmed_at::text
+            from controlplane.payout_requests pr
+            join public.assets a on a.id=pr.asset_id
+            where pr.account_id=$1::uuid
+            order by pr.created_at desc
+            limit 25
+            `,
+            [accountId],
+          ),
+          this.database.query(
+            `
+            with days as (
+              select generate_series(
+                current_date - interval '29 days',
+                current_date,
+                interval '1 day'
+              )::date as day
+            ),
+            incoming as (
+              select
+                coalesce(pi.completed_at::date,pi.created_at::date) as day,
+                sum(st.net_brl)::numeric as amount
+              from pixbrasil.settlements st
+              join pixbrasil.payment_intents pi on pi.id=st.payment_intent_id
+              where pi.merchant_id=$1::uuid
+                and pi.status='SUCCEEDED'
+                and coalesce(pi.completed_at,pi.created_at) >= current_date - interval '29 days'
+              group by 1
+            ),
+            outgoing as (
+              select
+                coalesce(pr.paid_at::date,pr.confirmed_at::date,pr.created_at::date) as day,
+                sum(pr.amount)::numeric as amount
+              from controlplane.payout_requests pr
+              where pr.account_id=$2::uuid
+                and pr.status in ('PAID','CONFIRMED')
+                and coalesce(pr.paid_at,pr.confirmed_at,pr.created_at) >= current_date - interval '29 days'
+              group by 1
+            )
+            select
+              d.day::text,
+              coalesce(i.amount,0)::text as incoming_brl,
+              coalesce(o.amount,0)::text as outgoing_brl
+            from days d
+            left join incoming i on i.day=d.day
+            left join outgoing o on o.day=d.day
+            order by d.day
+            `,
+            [merchant.merchant_id, accountId],
+          ),
+          this.database.query<{
+            key: string;
+            enabled: boolean;
+          }>(
+            `
+            select key,enabled
+            from controlplane.feature_flags
+            where key in ('routing_enforcement','live_payment_execution')
+            `,
+          ),
+        ]);
+
+        const brlWallet = walletResult.rows.find(
+          (wallet) => wallet.asset_code === "BRL",
+        );
+        const routingEnabled = Boolean(
+          flags.rows.find((flag) => flag.key === "routing_enforcement")?.enabled,
+        );
+        const liveEnabled = Boolean(
+          flags.rows.find((flag) => flag.key === "live_payment_execution")?.enabled,
         );
 
-        const payments = await this.database.query(
-          `
-          select
-            pi.id,
-            pi.external_reference,
-            pi.amount::text,
-            pi.currency,
-            pi.status,
-            pi.payment_method,
-            s.code as store_code,
-            pi.created_at::text,
-            pi.updated_at::text
-          from pixbrasil.payment_intents pi
-          left join pixbrasil.stores s on s.id=pi.store_id
-          where pi.merchant_id=$1::uuid
-          order by pi.created_at desc
-          limit 25
-          `,
-          [merchant.merchant_id],
-        );
+        const paymentRows = payments.rows as Array<Record<string, unknown>>;
+        const total = paymentRows.length;
+        const succeeded = paymentRows.filter(
+          (row) => row.status === "SUCCEEDED",
+        ).length;
+
+        capabilities = {
+          financialWritesEnabled: routingEnabled && liveEnabled,
+          pixCollectionEnabled: routingEnabled && liveEnabled,
+          payoutTicketsEnabled: true,
+          exchangeEnabled: false,
+          note:
+            "PIX collections operate through configured Stores. Payouts are processed by manual treasury ticket.",
+        };
 
         business = {
           merchant,
+          wallet: brlWallet ?? null,
+          finance: {
+            availableBrl: Number(brlWallet?.available ?? 0),
+            pendingBrl: Number(brlWallet?.pending ?? 0),
+            reservedBrl: Number(brlWallet?.reserved ?? 0),
+            blockedBrl: Number(brlWallet?.blocked ?? 0),
+            paymentCount: total,
+            succeededCount: succeeded,
+            successRate: total > 0 ? Math.round((succeeded / total) * 10000) / 100 : 0,
+          },
           stores: stores.rows,
-          payments: payments.rows,
+          payments: paymentRows,
+          payouts: payouts.rows,
+          flow30d: flow.rows,
         };
       }
     }
@@ -434,14 +591,7 @@ export class ClientService {
         wallets: walletResult.rows,
         transactions: txResult.rows,
         business,
-        capabilities: {
-          financialWritesEnabled: false,
-          depositsEnabled: false,
-          withdrawalsEnabled: false,
-          exchangeEnabled: false,
-          note:
-            "MVP client portal is read-only while payment execution, settlement and payout guardrails are validated.",
-        },
+        capabilities,
       },
     };
   }
