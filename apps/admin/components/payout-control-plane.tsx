@@ -77,8 +77,28 @@ export function PayoutControlPlane() {
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let active = true;
+
+    adminFetch<{ success: true; data: PayoutRow[] }>("/api/v1/admin/payouts")
+      .then((response) => {
+        if (!active) return;
+        setRows(response.data);
+        setError("");
+      })
+      .catch((cause: unknown) => {
+        if (!active) return;
+        setError(
+          cause instanceof Error ? cause.message : "Falha ao carregar payouts.",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const summary = useMemo(() => {
     const open = rows.filter((row) =>
