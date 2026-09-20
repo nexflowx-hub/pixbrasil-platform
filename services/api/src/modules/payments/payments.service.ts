@@ -953,8 +953,18 @@ export class PaymentsService {
               'providerStatus','PENDING'
             ),
             completed_at=now()
-        where id=$1::uuid;
+        where id=$1::uuid
+        `,
+        [
+          attempt.rows[0]!.id,
+          execution.providerPaymentId,
+          JSON.stringify(action),
+          execution.recovered,
+        ],
+      );
 
+      await this.database.query(
+        `
         update pixbrasil.payment_intents
         set status='PENDING_PAYMENT',
             metadata=metadata||jsonb_build_object(
@@ -962,14 +972,12 @@ export class PaymentsService {
               'providerAction',$3::jsonb
             ),
             updated_at=now()
-        where id=$5::uuid;
+        where id=$1::uuid
         `,
         [
-          attempt.rows[0]!.id,
+          input.paymentIntentId,
           execution.providerPaymentId,
           JSON.stringify(action),
-          execution.recovered,
-          input.paymentIntentId,
         ],
       );
 
@@ -1019,18 +1027,21 @@ export class PaymentsService {
             ambiguous=false,
             response_metadata=jsonb_build_object('message',$3::text),
             completed_at=now()
-        where id=$1::uuid;
-
-        update pixbrasil.payment_intents
-        set status='FAILED',updated_at=now()
-        where id=$4::uuid;
+        where id=$1::uuid
         `,
         [
           attempt.rows[0]!.id,
           execution.code ?? "PROVIDER_REJECTED",
           execution.message ?? null,
-          input.paymentIntentId,
         ],
+      );
+      await this.database.query(
+        `
+        update pixbrasil.payment_intents
+        set status='FAILED',updated_at=now()
+        where id=$1::uuid
+        `,
+        [input.paymentIntentId],
       );
 
       return this.loadChargeResult(input.paymentIntentId, false);
@@ -1046,17 +1057,21 @@ export class PaymentsService {
             ambiguous=false,
             response_metadata=jsonb_build_object('reason',$2::text),
             completed_at=now()
-        where id=$1::uuid;
-
+        where id=$1::uuid
+        `,
+        [attempt.rows[0]!.id, execution.reason],
+      );
+      await this.database.query(
+        `
         update pixbrasil.payment_intents
         set status='FAILED',
             metadata=metadata||jsonb_build_object(
               'failureReason','SAFE_FAILOVER_NO_SAME_CLASS_ROUTE'
             ),
             updated_at=now()
-        where id=$3::uuid;
+        where id=$1::uuid
         `,
-        [attempt.rows[0]!.id, execution.reason, input.paymentIntentId],
+        [input.paymentIntentId],
       );
 
       return this.loadChargeResult(input.paymentIntentId, false);
@@ -1071,17 +1086,21 @@ export class PaymentsService {
           ambiguous=true,
           response_metadata=jsonb_build_object('reason',$2::text),
           completed_at=now()
-      where id=$1::uuid;
-
+      where id=$1::uuid
+      `,
+      [attempt.rows[0]!.id, execution.reason],
+    );
+    await this.database.query(
+      `
       update pixbrasil.payment_intents
       set status='RECONCILIATION_REQUIRED',
           metadata=metadata||jsonb_build_object(
             'reconciliationReason',$2::text
           ),
           updated_at=now()
-      where id=$3::uuid;
+      where id=$1::uuid
       `,
-      [attempt.rows[0]!.id, execution.reason, input.paymentIntentId],
+      [input.paymentIntentId, execution.reason],
     );
 
     return this.loadChargeResult(input.paymentIntentId, false);
