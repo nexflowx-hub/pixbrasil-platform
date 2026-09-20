@@ -296,6 +296,7 @@ export class PaymentsService {
               ambiguous: Boolean(row.ambiguous),
             }
           : null,
+        action: asRecord(row.response_metadata).pix ?? null,
         economics: row.metadata?.shadowQuote ?? null,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
