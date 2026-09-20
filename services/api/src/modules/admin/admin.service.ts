@@ -1006,6 +1006,7 @@ export class AdminService {
         ass.symbol,
         pr.amount::text,
         pr.destination_type,
+        pr.destination_snapshot,
         pr.status,
         pr.external_reference,
         pr.approval_request_id,
