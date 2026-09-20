@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -287,4 +288,140 @@ export class ClientService {
       },
     };
   }
+
+  async requestPayoutTicket(
+    context: ClientContext,
+    accountId: string,
+    input: Record<string, unknown>,
+  ) {
+    const access = context.accounts.find(
+      (account) => account.accountId === accountId,
+    );
+    if (!access) {
+      throw new ForbiddenException("Account access is not granted.");
+    }
+    if (!["OWNER", "ADMIN", "FINANCE"].includes(access.role)) {
+      throw new ForbiddenException(
+        "This account role cannot request payouts.",
+      );
+    }
+
+    const amount = Math.round(Number(input.amount ?? 0) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("amount must be a positive BRL value.");
+    }
+
+    const destinationType = String(
+      input.destinationType ?? "PIX",
+    ).trim().toUpperCase();
+    if (!["PIX", "CRYPTO"].includes(destinationType)) {
+      throw new BadRequestException(
+        "destinationType must be PIX or CRYPTO.",
+      );
+    }
+
+    const destination =
+      input.destination &&
+      typeof input.destination === "object" &&
+      !Array.isArray(input.destination)
+        ? (input.destination as Record<string, unknown>)
+        : {};
+
+    const wallet = await this.database.query<{
+      wallet_id: string;
+      asset_id: string;
+      available: string;
+    }>(
+      `
+      select
+        w.id as wallet_id,
+        ass.id as asset_id,
+        coalesce(wb.available,0)::text as available
+      from public.wallets w
+      join public.assets ass on ass.id=w.asset_id
+      left join public.wallet_balances wb on wb.wallet_id=w.id
+      where w.account_id=$1::uuid
+        and ass.code='BRL'
+        and w.status='ACTIVE'
+      limit 1
+      `,
+      [accountId],
+    );
+
+    const walletRow = wallet.rows[0];
+    if (!walletRow) {
+      throw new BadRequestException("BRL wallet is not available.");
+    }
+    if (Number(walletRow.available) < amount) {
+      throw new BadRequestException("Insufficient available BRL balance.");
+    }
+
+    const result = await this.database.query<{
+      id: string;
+      external_reference: string;
+      status: string;
+      created_at: string;
+    }>(
+      `
+      insert into controlplane.payout_requests(
+        account_id,wallet_id,asset_id,amount,destination_type,
+        destination_snapshot,status,external_reference,
+        proof_metadata,requested_by,created_at,updated_at
+      )
+      values(
+        $1::uuid,$2::uuid,$3::uuid,$4::numeric,$5::varchar,
+        $6::jsonb,'DRAFT',
+        ('PAYOUT-' || to_char(now(),'YYYYMMDD') || '-' ||
+          upper(substr(replace(gen_random_uuid()::text,'-',''),1,8))),
+        jsonb_build_object(
+          'channel','TELEGRAM_MANUAL_TICKET',
+          'automation','PENDING'
+        ),
+        $7::uuid,now(),now()
+      )
+      returning id,external_reference,status,created_at::text
+      `,
+      [
+        accountId,
+        walletRow.wallet_id,
+        walletRow.asset_id,
+        amount,
+        destinationType,
+        JSON.stringify(destination),
+        context.authUserId,
+      ],
+    );
+
+    const ticket = result.rows[0];
+    const message = [
+      "PiXBrasil payout ticket",
+      `Reference: ${ticket.external_reference}`,
+      `Amount: R$ ${amount.toFixed(2)}`,
+      `Destination: ${destinationType}`,
+      "Status: aguardando operação manual",
+    ].join("\n");
+
+    return {
+      success: true,
+      data: {
+        ticketId: ticket.id,
+        reference: ticket.external_reference,
+        status: ticket.status,
+        amount,
+        currency: "BRL",
+        destinationType,
+        createdAt: ticket.created_at,
+        telegram: {
+          mode: "MANUAL_TICKET",
+          shareUrl:
+            "https://t.me/share/url?url=" +
+            encodeURIComponent("https://pixbrasil.org/app") +
+            "&text=" +
+            encodeURIComponent(message),
+          message,
+        },
+      },
+    };
+  }
+
 }
