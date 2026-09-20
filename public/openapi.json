@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "PiXBrasil Merchant API",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Server-side merchant API for PIX PaymentIntents, status and signed webhook endpoints. Live provider execution is controlled per Store."
   },
   "servers": [
@@ -163,7 +163,7 @@
         },
         "responses": {
           "200": {
-            "description": "PaymentIntent resolved. Stores in SHADOW return SHADOW_ONLY and do not create a real PIX."
+            "description": "PaymentIntent created. In production, PENDING_PAYMENT includes the provider payment ID and PIX action payload."
           },
           "400": {
             "description": "Invalid request."
