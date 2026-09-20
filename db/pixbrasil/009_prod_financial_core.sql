@@ -90,14 +90,6 @@ select gen_random_uuid(),'REVENUE:PIXBRASIL:BRL','REVENUE'::"LedgerAccountType",
 from public.assets ass where ass.code='BRL'
 on conflict (code) do nothing;
 
-insert into public.ledger_accounts(
-  id,code,type,owner_account_id,provider_id,asset_id,name,active,created_at,updated_at
-)
-select gen_random_uuid(),'EXPENSE:PIX_PROVIDER:BRL','EXPENSE'::"LedgerAccountType",
-       null,null,ass.id,'PIX Provider Cost',true,current_timestamp,current_timestamp
-from public.assets ass where ass.code='BRL'
-on conflict (code) do nothing;
-
 -- D1 is an operational 24h hold in PiXBrasil v1. Provider status remains
 -- verified independently by the provider adapter/webhook.
 update pixbrasil.release_rules rr
