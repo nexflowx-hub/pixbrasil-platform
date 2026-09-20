@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, Bot, Braces, CheckCircle2, CheckCircle2, KeyRound, RadioTower, Store, Webhook } from "lucide-react";
+import { ArrowRight, Bot, Braces, CheckCircle2, KeyRound, RadioTower, Store, Webhook } from "lucide-react";
 import { DocsCard, DocsGrid, DocsSection, DocsShell } from "@/components/docs/docs-shell";
 import { CopyBlock, InlineCode } from "@/components/docs/copy-block";
 
@@ -20,7 +20,7 @@ export default function DocsHomePage() {
       title="Integre PIX sem transformar o seu site num projeto financeiro."
       description="O PiXBrasil separa Store, routing, provider, liberação e credenciais. Esta documentação mostra o fluxo mínimo e seguro para integrar um site, e-commerce, SaaS ou funnel ao Core."
     >
-      <DocsSection id="status" title="Estado atual da plataforma" description="A documentação distingue capacidade disponível de execução financeira ainda em validação.">
+      <DocsSection id="status" title="Estado atual da plataforma" description="A documentação descreve as capacidades em produção, o routing por Store e o processamento manual de Tesouraria.">
         <DocsGrid>
           <DocsCard title="API S2S" tone="green">
             <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Disponível</div>
@@ -31,12 +31,12 @@ export default function DocsHomePage() {
             <p className="mt-2">Endpoints HTTPS assinados com HMAC-SHA256 e signing secret em Vault.</p>
           </DocsCard>
           <DocsCard title="Provider execution" tone="gold">
-            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> PRODUÇÃO / routing por Store</div>
-            <p className="mt-2">A Store só cria PIX real quando o modo de execução for explicitamente ativado.</p>
+            <div className="flex items-center gap-2 text-[#D9B969]"><CheckCircle2 className="h-3.5 w-3.5" /> PRODUÇÃO / routing por Store</div>
+            <p className="mt-2">Stores em produção criam PIX real através do provider selecionado pelo routing configurado.</p>
           </DocsCard>
           <DocsCard title="Payouts & settlement" tone="gold">
-            <div className="flex items-center gap-2 text-[#D9B969]"><Clock3 className="h-3.5 w-3.5" /> Guarded</div>
-            <p className="mt-2">Liberação e payout obedecem à release policy da Store; automações continuam feature-flagged.</p>
+            <div className="flex items-center gap-2 text-[#D9B969]"><CheckCircle2 className="h-3.5 w-3.5" /> Manual</div>
+            <p className="mt-2">Liberação obedece à release policy da Store; payouts são processados por ticket manual de Tesouraria nesta fase.</p>
           </DocsCard>
         </DocsGrid>
       </DocsSection>
