@@ -36,7 +36,7 @@ export class PaymentsController {
     @Headers("idempotency-key") idempotencyKey: string | undefined,
     @Body() body: Record<string, unknown>,
   ) {
-    return this.payments.createShadowCharge(
+    return this.payments.createCharge(
       request.merchantContext!,
       idempotencyKey,
       body,
