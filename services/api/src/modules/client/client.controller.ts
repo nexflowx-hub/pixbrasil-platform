@@ -1,7 +1,9 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
+  Post,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -17,6 +19,19 @@ export class ClientController {
   @Get("session")
   session(@Req() request: ClientRequest) {
     return this.client.session(request.clientContext!);
+  }
+
+  @Post("accounts/:accountId/payout-ticket")
+  payoutTicket(
+    @Param("accountId") accountId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() request: ClientRequest,
+  ) {
+    return this.client.requestPayoutTicket(
+      request.clientContext!,
+      accountId,
+      body,
+    );
   }
 
   @Get("accounts/:accountId/overview")
