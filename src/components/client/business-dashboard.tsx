@@ -22,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 
 type StoreRow = {
   id?: string;
@@ -181,24 +181,22 @@ export function BusinessDashboard({
   const [pixKey, setPixKey] = useState("");
   const [pixKeyType, setPixKeyType] = useState("EVP");
 
-  const gatewayRows = useMemo(() => {
+  const gatewayRows = (() => {
     const unique = new Map<string, StoreRow>();
     for (const store of stores) {
       const key = String(store.gateway_alias ?? store.provider_code ?? store.code);
       if (!unique.has(key)) unique.set(key, store);
     }
     return [...unique.values()];
-  }, [stores]);
+  })();
 
-  const maxFlow = useMemo(() => {
-    return Math.max(
-      1,
-      ...flow.flatMap((row) => [
-        Number(row.incoming_brl ?? 0),
-        Number(row.outgoing_brl ?? 0),
-      ]),
-    );
-  }, [flow]);
+  const maxFlow = Math.max(
+    1,
+    ...flow.flatMap((row) => [
+      Number(row.incoming_brl ?? 0),
+      Number(row.outgoing_brl ?? 0),
+    ]),
+  );
 
   async function submitPayout(event: FormEvent) {
     event.preventDefault();
