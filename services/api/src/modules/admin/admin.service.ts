@@ -993,6 +993,121 @@ export class AdminService {
     return { success: true, data: result.rows };
   }
 
+  async releaseSettlement(
+    settlementId: string,
+    admin: AdminContext,
+  ) {
+    return this.database.withTransaction(async (client) => {
+      const current = await client.query<{
+        id: string;
+        status: string;
+        net_brl: string;
+        payment_intent_id: string;
+        account_id: string;
+      }>(
+        `
+        select
+          st.id,
+          st.status,
+          st.net_brl::text,
+          st.payment_intent_id,
+          pi.account_id
+        from pixbrasil.settlements st
+        join pixbrasil.payment_intents pi on pi.id=st.payment_intent_id
+        where st.id=$1::uuid
+        limit 1
+        for update of st
+        `,
+        [settlementId],
+      );
+
+      const row = current.rows[0];
+      if (!row) throw new NotFoundException("Settlement not found.");
+      if (row.status !== "PENDING") {
+        throw new ConflictException(
+          `Settlement is ${row.status}, not PENDING.`,
+        );
+      }
+
+      const wallet = await client.query<{ wallet_id: string; pending: string }>(
+        `
+        select
+          w.id as wallet_id,
+          wb.pending::text
+        from public.wallets w
+        join public.assets ass on ass.id=w.asset_id and ass.code='BRL'
+        join public.wallet_balances wb on wb.wallet_id=w.id
+        where w.account_id=$1::uuid
+          and w.status='ACTIVE'
+        limit 1
+        for update of wb
+        `,
+        [row.account_id],
+      );
+
+      const walletRow = wallet.rows[0];
+      if (!walletRow) {
+        throw new ConflictException("BRL wallet balance not found.");
+      }
+
+      const net = Number(row.net_brl);
+      if (Number(walletRow.pending) < net) {
+        throw new ConflictException(
+          "Pending wallet balance is lower than settlement net.",
+        );
+      }
+
+      await client.query(
+        `
+        update public.wallet_balances
+        set pending=pending-$2::numeric,
+            available=available+$2::numeric,
+            updated_at=now()
+        where wallet_id=$1::uuid
+        `,
+        [walletRow.wallet_id, net],
+      );
+
+      const updated = await client.query(
+        `
+        update pixbrasil.settlements
+        set status='AVAILABLE',
+            available_at=now(),
+            metadata=coalesce(metadata,'{}'::jsonb) ||
+              jsonb_build_object(
+                'releasedManually',true,
+                'releasedBy',$2::text,
+                'releasedAt',now()
+              ),
+            updated_at=now()
+        where id=$1::uuid
+        returning *
+        `,
+        [settlementId, admin.authUserId],
+      );
+
+      await client.query(
+        `
+        insert into public.audit_logs(
+          id,actor_type,actor_user_id,action,resource_type,resource_id,
+          before,after,metadata,created_at
+        )
+        values(
+          gen_random_uuid(),'ADMIN',$1::uuid,'SETTLEMENT_RELEASED',
+          'settlement',$2::varchar,
+          jsonb_build_object('status','PENDING'),
+          jsonb_build_object('status','AVAILABLE'),
+          jsonb_build_object('netBrl',$3::numeric),
+          now()
+        )
+        `,
+        [admin.authUserId, settlementId, net],
+      );
+
+      return { success: true, data: updated.rows[0] };
+    });
+  }
+
   async payoutsOverview() {
     const result = await this.database.query(
       `
