@@ -73,6 +73,17 @@ interface FeeRuleRow {
   fixed_fee_brl: string;
 }
 
+interface ReleaseRuleRow {
+  rail: string;
+  asset_code: string | null;
+  network_code: string | null;
+  availability_mode: string;
+  available_after_minutes: number | null;
+  max_release_minutes: number | null;
+  payout_mode: string;
+  ticket_required: boolean;
+}
+
 export function calculateFeeBrl(
   amount: number,
   feeBps: number,
@@ -476,16 +487,7 @@ export class PaymentsService {
         )
       : { rows: [] as FeeRuleRow[] };
 
-    const releaseRules = await this.database.query<{
-      rail: string;
-      asset_code: string | null;
-      network_code: string | null;
-      availability_mode: string;
-      available_after_minutes: number | null;
-      max_release_minutes: number | null;
-      payout_mode: string;
-      ticket_required: boolean;
-    }>(
+    const releaseRules = await this.database.query<ReleaseRuleRow>(
       `
       select
         rail,asset_code,network_code,availability_mode,
