@@ -362,9 +362,11 @@ function PayoutOperations({
         <thead>
           <tr>
             <th>Criado</th>
+            <th>Merchant</th>
             <th>Conta</th>
             <th>Ativo</th>
             <th>Valor</th>
+            <th>Destino</th>
             <th>Status</th>
             <th>Referência</th>
             <th>Ações</th>
@@ -378,9 +380,39 @@ function PayoutOperations({
             return (
               <tr key={payoutId}>
                 <td>{renderValue(row.created_at, "created_at")}</td>
+                <td>
+                  <strong>{String(row.merchant ?? "—")}</strong>
+                  <span className="muted-value block">
+                    {String(row.account_owner_email ?? "")}
+                  </span>
+                </td>
                 <td>{String(row.account_type ?? "—")}</td>
                 <td>{String(row.asset_code ?? "—")}</td>
                 <td>{String(row.amount ?? "—")}</td>
+                <td>
+                  {(() => {
+                    const destination =
+                      row.destination_snapshot &&
+                      typeof row.destination_snapshot === "object" &&
+                      !Array.isArray(row.destination_snapshot)
+                        ? (row.destination_snapshot as Record<string, unknown>)
+                        : {};
+                    const pixKey = String(destination.pixKey ?? "");
+                    const beneficiary = String(
+                      destination.beneficiaryName ?? "",
+                    );
+                    return (
+                      <div>
+                        <code>{pixKey || "—"}</code>
+                        {beneficiary ? (
+                          <span className="muted-value block">
+                            {beneficiary}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
+                </td>
                 <td>{renderValue(status, "status")}</td>
                 <td>{String(row.external_reference ?? "—")}</td>
                 <td>

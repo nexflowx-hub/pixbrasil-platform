@@ -1000,19 +1000,25 @@ export class AdminService {
         pr.id,
         pr.account_id,
         a.type::text as account_type,
+        u.email as account_owner_email,
+        m.trade_name as merchant,
         ass.code as asset_code,
         ass.symbol,
         pr.amount::text,
         pr.destination_type,
+        pr.destination_snapshot,
         pr.status,
         pr.external_reference,
         pr.approval_request_id,
+        pr.proof_metadata,
         pr.approved_at,
         pr.paid_at,
         pr.confirmed_at,
         pr.created_at
       from controlplane.payout_requests pr
       join public.accounts a on a.id=pr.account_id
+      join public.users u on u.id=a.user_id
+      left join pixbrasil.merchants m on m.account_id=a.id
       join public.assets ass on ass.id=pr.asset_id
       order by pr.created_at desc
       limit 300

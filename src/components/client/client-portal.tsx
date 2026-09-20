@@ -131,6 +131,9 @@ type ProviderHealth = {
   health: string;
   latency_ms: number | null;
   tested_at: string | null;
+  attempts_30d: number;
+  successes_30d: number;
+  success_rate_30d: string | null;
 };
 
 type CashflowRow = {
@@ -228,12 +231,12 @@ function compactId(value: string) {
 function statusTone(value: string) {
   const normalized = value.toUpperCase();
   if (["ACTIVE", "HEALTHY", "SUCCEEDED", "AVAILABLE", "CONFIRMED", "PAID"].includes(normalized)) {
-    return "border-emerald-300/25 bg-emerald-300/8 text-emerald-200";
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
   if (["PENDING", "PENDING_PAYMENT", "APPROVAL_REQUIRED", "PROCESSING"].includes(normalized)) {
-    return "border-amber-300/25 bg-amber-300/8 text-amber-200";
+    return "border-amber-200 bg-amber-50 text-amber-700";
   }
-  return "border-white/10 bg-white/[.03] text-[#8FA59F]";
+  return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
 export function ClientPortal() {
@@ -373,6 +376,36 @@ function BusinessDashboard(props: {
     reservedBrl: 0,
     blockedBrl: 0,
   };
+  const [searchQuery, setSearchQuery] = useState("");
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredStores = (business?.stores ?? []).filter((store) => {
+    if (!normalizedSearch) return true;
+    return [
+      store.code,
+      store.name,
+      store.provider_code ?? "",
+      store.gateway_alias ?? "",
+      store.release_class ?? "",
+      store.status,
+    ].some((value) => value.toLowerCase().includes(normalizedSearch));
+  });
+  const filteredPayments = (business?.payments ?? []).filter((payment) => {
+    if (!normalizedSearch) return true;
+    return [
+      payment.external_reference ?? "",
+      payment.store_code ?? "",
+      payment.provider_code ?? "",
+      payment.provider_payment_id ?? "",
+      payment.status,
+      payment.amount,
+    ].some((value) => String(value).toLowerCase().includes(normalizedSearch));
+  });
+  const activeAlerts =
+    (business?.payouts ?? []).filter((row) =>
+      ["APPROVAL_REQUIRED", "APPROVED", "PROCESSING"].includes(row.status),
+    ).length +
+    (business?.settlements ?? []).filter((row) => row.status === "PENDING").length;
+
   const today = new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "medium",
     timeStyle: "short",
@@ -393,6 +426,8 @@ function BusinessDashboard(props: {
             <div className="relative hidden max-w-[680px] flex-1 md:block">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#6C7E79]" />
               <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Buscar transações, Stores, referências..."
                 className="h-10 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] pl-11 pr-4 text-[12px] outline-none focus:border-[#20D99A]"
               />
@@ -405,8 +440,17 @@ function BusinessDashboard(props: {
                 <CircleHelp className="h-4 w-4" />
                 Ajuda
               </a>
-              <button className="relative flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[#F1F6F4]">
+              <button
+                className="relative flex h-9 w-9 items-center justify-center rounded-lg hover:bg-[#F1F6F4]"
+                aria-label={activeAlerts ? activeAlerts + " alertas operacionais" : "Sem alertas operacionais"}
+                title={activeAlerts ? activeAlerts + " alertas operacionais" : "Sem alertas operacionais"}
+              >
                 <Bell className="h-4 w-4" />
+                {activeAlerts ? (
+                  <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[7px] font-bold text-white">
+                    {activeAlerts > 9 ? "9+" : activeAlerts}
+                  </span>
+                ) : null}
               </button>
               <div className="h-7 w-px bg-[#E1E8E5]" />
               <button className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-[#F1F6F4]">
@@ -532,12 +576,12 @@ function BusinessDashboard(props: {
               </section>
 
               <div className="grid gap-4 2xl:grid-cols-[1.28fr_.92fr]">
-                <StoreReleasePanel stores={business?.stores ?? []} />
+                <StoreReleasePanel stores={filteredStores} />
                 <GatewayPanel providers={business?.providerHealth ?? []} />
               </div>
 
               <div id="payments" className="grid gap-4 2xl:grid-cols-[1.18fr_1fr]">
-                <PaymentsPanel payments={business?.payments ?? []} />
+                <PaymentsPanel payments={filteredPayments} />
                 <CashflowPanel rows={business?.cashflow ?? []} summary={summary} />
               </div>
 
@@ -708,6 +752,7 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
               <tr className="border-b border-[#E3EBE8] text-[#748780]">
                 <th className="px-3 py-3 font-semibold">Store</th>
                 <th className="px-3 py-3 font-semibold">Provider</th>
+                <th className="px-3 py-3 font-semibold">Liberação</th>
                 <th className="px-3 py-3 font-semibold">Release</th>
                 <th className="px-3 py-3 font-semibold">A liberar</th>
                 <th className="px-3 py-3 font-semibold">Disponível</th>
@@ -724,6 +769,33 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
                   <td className="px-3 py-3">
                     <span className="font-semibold">{store.provider_code || "—"}</span>
                     <span className="mt-1 block text-[8px] text-[#85958F]">{store.gateway_alias || "—"}</span>
+                  </td>
+                  <td className="px-3 py-3">
+                    {(() => {
+                      const available = Number(store.available_brl || 0);
+                      const pending = Number(store.pending_brl || 0);
+                      const total = available + pending;
+                      const progress = total > 0 ? Math.round((available / total) * 100) : 100;
+                      return (
+                        <div className="min-w-[120px]">
+                          <div className="flex items-center justify-between text-[8px] text-[#71847D]">
+                            <span>{progress}% disponível</span>
+                            <span>{store.release_class || "—"}</span>
+                          </div>
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#E6EFEC]">
+                            <div
+                              className="h-full rounded-full bg-[#20D99A]"
+                              style={{ width: progress + "%" }}
+                            />
+                          </div>
+                          <span className="mt-1.5 block text-[7px] text-[#8A9A95]">
+                            {store.next_available_at
+                              ? "Próxima liberação " + new Date(store.next_available_at).toLocaleString("pt-BR")
+                              : "Sem valores pendentes"}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-3 py-3">
                     <span className="font-semibold">{store.release_class || "—"}</span>
@@ -763,8 +835,21 @@ function GatewayPanel({ providers }: { providers: ProviderHealth[] }) {
               </span>
             </div>
             <span className="mt-1 block text-[8px] text-[#84968F]">{provider.gateway_alias}</span>
-            <div className="mt-3 flex gap-4 text-[8px] text-[#62766F]">
+            <div className="mt-3 grid grid-cols-2 gap-2 text-[8px] text-[#62766F]">
               <span>Latência <strong>{provider.latency_ms ?? "—"} ms</strong></span>
+              <span className="text-right">
+                Sucesso 30d{" "}
+                <strong>
+                  {provider.success_rate_30d == null
+                    ? "—"
+                    : Number(provider.success_rate_30d).toLocaleString("pt-BR", {
+                        maximumFractionDigits: 2,
+                      }) + "%"}
+                </strong>
+              </span>
+              <span className="col-span-2 text-[#87968F]">
+                {provider.attempts_30d || 0} tentativas · {provider.successes_30d || 0} concluídas
+              </span>
             </div>
           </div>
         ))}

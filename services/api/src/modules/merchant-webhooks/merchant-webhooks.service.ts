@@ -3,6 +3,8 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
 } from "@nestjs/common";
 import {
   createHash,
@@ -164,8 +166,22 @@ async function validateEndpointUrl(value: unknown): Promise<string> {
 }
 
 @Injectable()
-export class MerchantWebhooksService {
+export class MerchantWebhooksService implements OnModuleInit, OnModuleDestroy {
+  private retryTimer?: NodeJS.Timeout;
+
   constructor(private readonly database: DatabaseService) {}
+
+  onModuleInit() {
+    this.retryTimer = setInterval(() => {
+      void this.retryDueDeliveries().catch(() => undefined);
+    }, 60_000);
+    this.retryTimer.unref();
+    void this.retryDueDeliveries().catch(() => undefined);
+  }
+
+  onModuleDestroy() {
+    if (this.retryTimer) clearInterval(this.retryTimer);
+  }
 
   async listEndpoints(merchant: MerchantApiContext) {
     const result = await this.database.query<EndpointRow>(
@@ -508,7 +524,7 @@ export class MerchantWebhooksService {
       .update(timestamp + "." + body)
       .digest("hex");
 
-    await this.database.query(
+    const inserted = await this.database.query<{ id: string }>(
       `
       insert into pixbrasil.merchant_webhook_deliveries(
         id,
@@ -524,6 +540,8 @@ export class MerchantWebhooksService {
         $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::varchar,$6::jsonb,
         'PENDING',0
       )
+      on conflict do nothing
+      returning id
       `,
       [
         input.deliveryId,
@@ -535,6 +553,38 @@ export class MerchantWebhooksService {
       ],
     );
 
+    let deliveryId = inserted.rows[0]?.id ?? input.deliveryId;
+
+    if (!inserted.rows[0] && input.paymentIntentId) {
+      const existing = await this.database.query<{
+        id: string;
+        status: string;
+      }>(
+        `
+        select id,status
+        from pixbrasil.merchant_webhook_deliveries
+        where endpoint_id=$1::uuid
+          and payment_intent_id=$2::uuid
+          and event_type=$3::varchar
+        order by created_at desc
+        limit 1
+        `,
+        [input.endpoint.id, input.paymentIntentId, input.eventType],
+      );
+
+      if (existing.rows[0]) {
+        deliveryId = existing.rows[0].id;
+        if (existing.rows[0].status === "DELIVERED") {
+          return {
+            delivered: true,
+            httpStatus: 200,
+            deliveryId,
+            deduplicated: true,
+          };
+        }
+      }
+    }
+
     let response: Response | null = null;
     let error = "";
     try {
@@ -545,7 +595,7 @@ export class MerchantWebhooksService {
           "Content-Type": "application/json",
           "User-Agent": "PiXBrasil-Webhooks/1.0",
           "X-PiXBrasil-Event": input.eventType,
-          "X-PiXBrasil-Delivery": input.deliveryId,
+          "X-PiXBrasil-Delivery": deliveryId,
           "X-PiXBrasil-Timestamp": timestamp,
           "X-PiXBrasil-Signature": "v1=" + signature,
         },
@@ -583,7 +633,7 @@ export class MerchantWebhooksService {
       where id=$1::uuid
       `,
       [
-        input.deliveryId,
+        deliveryId,
         delivered ? "DELIVERED" : "FAILED",
         response?.status ?? null,
         responseExcerpt || null,
@@ -617,6 +667,67 @@ export class MerchantWebhooksService {
     return {
       delivered,
       httpStatus: response?.status ?? null,
+      deliveryId,
+      deduplicated: false,
     };
+  }
+
+  private async retryDueDeliveries() {
+    const due = await this.database.query<
+      EndpointRow & {
+        delivery_id: string;
+        event_type: string;
+        payload: Record<string, unknown>;
+        payment_intent_id: string | null;
+        decrypted_secret: string | null;
+        merchant_id: string;
+      }
+    >(
+      `
+      select
+        d.id as delivery_id,
+        d.event_type,
+        d.payload,
+        d.payment_intent_id,
+        d.merchant_id,
+        e.id,
+        e.name,
+        e.endpoint_url,
+        e.events::text[],
+        e.status,
+        e.failure_count,
+        e.last_delivery_at::text,
+        e.last_error,
+        e.created_at::text,
+        v.decrypted_secret
+      from pixbrasil.merchant_webhook_deliveries d
+      join pixbrasil.merchant_webhook_endpoints e on e.id=d.endpoint_id
+      left join vault.decrypted_secrets v on v.id=e.vault_secret_id
+      where d.status='FAILED'
+        and d.next_attempt_at is not null
+        and d.next_attempt_at <= now()
+        and d.attempt_count < 8
+        and e.status='ACTIVE'
+      order by d.next_attempt_at asc
+      limit 50
+      `,
+    );
+
+    let retried = 0;
+    for (const row of due.rows) {
+      if (!row.decrypted_secret) continue;
+
+      await this.sendDelivery({
+        endpoint: row,
+        deliveryId: row.delivery_id,
+        eventType: row.event_type,
+        payload: row.payload,
+        merchantId: row.merchant_id,
+        paymentIntentId: row.payment_intent_id,
+      });
+      retried += 1;
+    }
+
+    return { retried };
   }
 }

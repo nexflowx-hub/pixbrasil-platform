@@ -940,14 +940,22 @@ export class FinancialCoreService implements OnModuleInit, OnModuleDestroy {
       };
     }
 
+    const maskedPixKey =
+      input.pixKey.length <= 8
+        ? "••••" + input.pixKey.slice(-2)
+        : input.pixKey.slice(0, 3) +
+          "••••••" +
+          input.pixKey.slice(-4);
+
     const text = [
       "🏦 PiXBrasil · Novo payout manual",
       `Ticket: ${input.payoutId}`,
-      `Conta: ${input.accountId}`,
       `Cliente: ${input.email || "—"}`,
       `Valor: R$ ${input.amount.toFixed(2)}`,
-      `PIX: ${input.pixKey}`,
+      `PIX: ${maskedPixKey}`,
       input.note ? `Nota: ${input.note.slice(0, 500)}` : "",
+      "Abrir no Control Plane:",
+      `https://admin.pixbrasil.org/payouts?ticket=${encodeURIComponent(input.payoutId)}`,
     ]
       .filter(Boolean)
       .join("\n");
