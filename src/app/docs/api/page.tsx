@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 const createRequest = "POST /api/v1/payments/charge\nAuthorization: Bearer pix_live_...\nIdempotency-Key: order-8472-pix-1\nContent-Type: application/json\n\n{\n  \"store\": \"SIGNUM\",\n  \"amount\": 149.90,\n  \"currency\": \"BRL\",\n  \"reference\": \"ORDER-8472\",\n  \"description\": \"SIGNUM 312\",\n  \"payer\": {\n    \"name\": \"Cliente Exemplo\",\n    \"taxId\": \"CPF_OU_CNPJ_VALIDO\",\n    \"email\": \"cliente@example.com\",\n    \"phone\": \"+55...\"\n  },\n  \"metadata\": {\n    \"orderId\": \"8472\",\n    \"attribution\": {\n      \"utm_source\": \"meta\",\n      \"utm_medium\": \"paid\",\n      \"utm_campaign\": \"launch\"\n    }\n  }\n}";
 
-const shadowResponse = "{\n  \"success\": true,\n  \"data\": {\n    \"paymentIntentId\": \"uuid\",\n    \"idempotentReplay\": false,\n    \"status\": \"SHADOW_ONLY\",\n    \"amount\": 149.90,\n    \"currency\": \"BRL\",\n    \"reference\": \"ORDER-8472\",\n    \"store\": {\n      \"code\": \"SIGNUM\",\n      \"name\": \"Signum\"\n    },\n    \"routing\": {\n      \"mode\": \"SHADOW\",\n      \"policy\": \"NS-SIGNUM-PIX-D0\",\n      \"providerCode\": \"MISTICPAY\",\n      \"gatewayAlias\": \"misticpay-primary\",\n      \"releaseClass\": \"D0\",\n      \"crossReleaseClassFailover\": false\n    }\n  }\n}";
+const liveResponse = "{\n  \"success\": true,\n  \"data\": {\n    \"paymentIntentId\": \"uuid\",\n    \"idempotentReplay\": false,\n    \"status\": \"PENDING_PAYMENT\",\n    \"amount\": 149.90,\n    \"currency\": \"BRL\",\n    \"reference\": \"ORDER-8472\",\n    \"store\": {\n      \"code\": \"SIGNUM\",\n      \"name\": \"Signum\"\n    },\n    \"routing\": {\n      \"mode\": \"LIVE\",\n      \"policy\": \"NS-SIGNUM-PIX-D0\",\n      \"providerCode\": \"MISTICPAY\",\n      \"gatewayAlias\": \"misticpay-primary\",\n      \"releaseClass\": \"D0\",\n      \"crossReleaseClassFailover\": false\n    },\n    \"provider\": {\n      \"paymentId\": \"provider-payment-id\",\n      \"recovered\": false\n    },\n    \"action\": {\n      \"type\": \"PIX\",\n      \"providerCode\": \"MISTICPAY\",\n      \"copyPaste\": \"000201...\",\n      \"qrCodeImage\": \"data:image/png;base64,...\"\n    },\n    \"economics\": {\n      \"grossBrl\": 149.90,\n      \"providerRouteCostBrl\": 8.99,\n      \"platformFeeBrl\": 0,\n      \"estimatedMerchantNetBrl\": 140.91\n    },\n    \"release\": {\n      \"profile\": \"PIX_D0\"\n    }\n  }\n}";
 
 const getPayment = "GET /api/v1/payments/{paymentIntentId}\nAuthorization: Bearer pix_live_...";
 
@@ -38,9 +38,9 @@ export default function ApiDocsPage() {
 
       <DocsSection id="create" title="POST /payments/charge" description="Cria um PaymentIntent idempotente e resolve Store → policy → provider → economics → release.">
         <CopyBlock label="Request" language="http" code={createRequest} />
-        <div className="mt-4"><CopyBlock label="Response while Store is SHADOW" language="json" code={shadowResponse} /></div>
-        <div className="mt-4 rounded-2xl border border-[#D2A34E]/16 bg-[#D2A34E]/4 p-4 text-[9px] leading-5 text-[#9A8C69]">
-          <strong className="text-[#D6B96B]">Importante:</strong> <InlineCode>SHADOW_ONLY</InlineCode> significa que routing/economia foram validados, mas nenhum PIX real foi criado. Não renderize QR Code se a resposta estiver em SHADOW.
+        <div className="mt-4"><CopyBlock label="Production response" language="json" code={liveResponse} /></div>
+        <div className="mt-4 rounded-2xl border border-[#20F29A]/16 bg-[#20F29A]/4 p-4 text-[9px] leading-5 text-[#7FB9A8]">
+          <strong className="text-[#79D8B8]">Produção:</strong> quando <InlineCode>status</InlineCode> for <InlineCode>PENDING_PAYMENT</InlineCode>, use <InlineCode>action.copyPaste</InlineCode> e/ou <InlineCode>action.qrCodeImage</InlineCode> para apresentar o PIX. A confirmação financeira final chega por <InlineCode>payment.succeeded</InlineCode>.
         </div>
       </DocsSection>
 
