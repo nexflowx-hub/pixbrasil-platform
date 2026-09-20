@@ -87,7 +87,7 @@ export function HeroSection() {
             className="anim-hero-text text-[10.5px] font-bold uppercase tracking-[0.3em] text-aqua sm:text-[11px]"
             style={{ animationDelay: "0.05s" }}
           >
-            MVP privado · infraestrutura financeira em validação
+            Infraestrutura financeira brasileira · operação em produção
           </p>
 
           <h1 className="mt-4 text-[42px] font-bold leading-[0.99] tracking-[-0.035em] text-cream sm:text-[44px] lg:text-[42px] xl:text-[50px] 2xl:text-[52px] 3xl:text-[54px]">
@@ -115,10 +115,9 @@ export function HeroSection() {
             className="anim-hero-item mt-5 max-w-[520px] text-[15px] leading-[1.55] text-mist sm:text-[15.5px]"
             style={{ animationDelay: "0.4s" }}
           >
-            Uma camada brasileira para organizar PIX, routing, saldos e
-            liquidação digital com rastreabilidade de ponta a ponta. O acesso
-            inicial é controlado enquanto cada rail financeiro conclui sua
-            validação operacional.
+            Uma camada brasileira para receber via PIX, aplicar routing,
+            controlar saldos, liberações e payouts com rastreabilidade de
+            ponta a ponta para operações Personal e Business.
           </p>
 
           <div
@@ -129,7 +128,7 @@ export function HeroSection() {
               href="/early-access"
               className="btn-cta group flex h-[46px] items-center justify-center gap-2.5 whitespace-nowrap rounded-full px-7 text-[14.5px] font-bold"
             >
-              Solicitar acesso
+              Começar agora
               <ArrowRight
                 className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
                 aria-hidden="true"
