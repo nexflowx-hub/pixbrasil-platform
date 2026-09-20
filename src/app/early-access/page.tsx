@@ -2,24 +2,24 @@ import type { Metadata } from "next";
 import { InfoPage } from "@/components/marketing/info-page";
 
 export const metadata: Metadata = {
-  title: "Acesso Antecipado",
-  description: "Acesso controlado ao MVP PiXBrasil.",
-  robots: { index: false, follow: false },
+  title: "Abrir conta",
+  description: "Onboarding PiXBrasil Personal e Business.",
 };
 
-export default function EarlyAccessPage() {
+export default function OnboardingPage() {
   return (
     <InfoPage
-      eyebrow="Acesso antecipado"
-      title="O MVP está em acesso controlado."
-      description="O Client Portal e o Control Plane já estão operacionais para identidades convidadas. Novas contas ainda não são abertas automaticamente: onboarding, KYC e capacidades financeiras são liberados por etapas."
+      eyebrow="Onboarding"
+      title="Conecte sua operação ao PiXBrasil."
+      description="Contas Business podem operar PIX por Store, routing multi-provider, settlement, Wallet BRL e webhooks. O onboarding define identidade, permissões, Stores e perfil comercial antes da emissão das credenciais de produção."
       bullets={[
-        "Acesso Personal e Business por convite",
-        "Portal autenticado com estados reais do Core",
-        "API PIX empresarial em piloto SHADOW",
-        "Operações financeiras liberadas somente após validação do rail",
+        "Conta Personal e Business com acesso autenticado",
+        "Stores e routing configurados por operação",
+        "API PIX S2S e webhooks assinados",
+        "Wallet BRL com liberações D0/D1",
+        "Payouts por ticket operacional nesta fase",
       ]}
-      note="Não envie documentos, chaves ou credenciais por canais não autorizados. O fluxo público de onboarding será aberto quando identidade, risco e consentimentos estiverem integrados de ponta a ponta."
+      note="Credenciais de API, signing secrets e dados financeiros devem ser configurados apenas nos canais seguros disponibilizados pelo PiXBrasil."
     />
   );
 }
