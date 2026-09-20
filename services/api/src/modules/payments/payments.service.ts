@@ -298,7 +298,7 @@ export class PaymentsService {
     };
   }
 
-  async createShadowCharge(
+  async createCharge(
     merchant: MerchantApiContext,
     idempotencyKeyValue: string | undefined,
     input: ChargeInput,
