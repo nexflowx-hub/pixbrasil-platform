@@ -1021,6 +1021,118 @@ export class AdminService {
     return { success: true, data: result.rows };
   }
 
+  async rejectManualPayout(
+    payoutId: string,
+    body: Record<string, unknown>,
+    admin: AdminContext,
+  ) {
+    const reason = String(body.reason ?? "").trim().slice(0, 500);
+
+    await this.database.query(
+      `
+      select controlplane.reject_manual_payout(
+        $1::uuid,$2::uuid,$3::text
+      )
+      `,
+      [payoutId, admin.authUserId, reason || null],
+    );
+
+    await this.database.query(
+      `
+      insert into public.audit_logs(
+        id,actor_type,actor_user_id,action,resource_type,resource_id,
+        before,after,metadata,created_at
+      )
+      values(
+        gen_random_uuid(),'ADMIN',$1::uuid,'PAYOUT_REJECTED',
+        'payout_request',$2::text,
+        '{}'::jsonb,
+        jsonb_build_object('status','REJECTED'),
+        jsonb_build_object('reason',$3::text),
+        now()
+      )
+      `,
+      [admin.authUserId, payoutId, reason || null],
+    );
+
+    return { success: true, data: { payoutId, status: "REJECTED" } };
+  }
+
+  async markManualPayoutPaid(
+    payoutId: string,
+    body: Record<string, unknown>,
+    admin: AdminContext,
+  ) {
+    const proofReference = requiredString(
+      body.proofReference,
+      "proofReference",
+    ).slice(0, 240);
+
+    await this.database.query(
+      `
+      select controlplane.mark_manual_payout_paid(
+        $1::uuid,$2::uuid,$3::text
+      )
+      `,
+      [payoutId, admin.authUserId, proofReference],
+    );
+
+    await this.database.query(
+      `
+      insert into public.audit_logs(
+        id,actor_type,actor_user_id,action,resource_type,resource_id,
+        before,after,metadata,created_at
+      )
+      values(
+        gen_random_uuid(),'ADMIN',$1::uuid,'PAYOUT_MARKED_PAID',
+        'payout_request',$2::text,
+        '{}'::jsonb,
+        jsonb_build_object('status','PAID'),
+        jsonb_build_object('proofReference',$3::text),
+        now()
+      )
+      `,
+      [admin.authUserId, payoutId, proofReference],
+    );
+
+    return {
+      success: true,
+      data: { payoutId, status: "PAID", proofReference },
+    };
+  }
+
+  async confirmManualPayout(
+    payoutId: string,
+    admin: AdminContext,
+  ) {
+    await this.database.query(
+      `
+      select controlplane.confirm_manual_payout($1::uuid,$2::uuid)
+      `,
+      [payoutId, admin.authUserId],
+    );
+
+    await this.database.query(
+      `
+      insert into public.audit_logs(
+        id,actor_type,actor_user_id,action,resource_type,resource_id,
+        before,after,metadata,created_at
+      )
+      values(
+        gen_random_uuid(),'ADMIN',$1::uuid,'PAYOUT_CONFIRMED',
+        'payout_request',$2::text,
+        '{}'::jsonb,
+        jsonb_build_object('status','CONFIRMED'),
+        '{}'::jsonb,
+        now()
+      )
+      `,
+      [admin.authUserId, payoutId],
+    );
+
+    return { success: true, data: { payoutId, status: "CONFIRMED" } };
+  }
+
   async usersOverview() {
     const result = await this.database.query(
       `
