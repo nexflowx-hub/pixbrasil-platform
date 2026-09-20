@@ -291,6 +291,11 @@ export class PaymentsService {
               paymentId: row.provider_payment_id,
               attemptStatus: row.provider_attempt_status,
               ambiguous: Boolean(row.ambiguous),
+              action:
+                row.response_metadata &&
+                typeof row.response_metadata.action === "object"
+                  ? row.response_metadata.action
+                  : row.metadata?.providerAction ?? null,
             }
           : null,
         economics: row.metadata?.shadowQuote ?? null,
