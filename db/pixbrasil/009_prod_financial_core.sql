@@ -11,6 +11,11 @@ create index if not exists payout_requests_status_created_idx
 create index if not exists payout_requests_account_created_idx
   on controlplane.payout_requests(account_id, created_at desc);
 
+create index if not exists provider_webhook_events_pending_reconcile_idx
+  on pixbrasil.provider_webhook_events(status, received_at)
+  where status='PROCESSED';
+
+
 update public.assets
 set deposit_enabled=true,
     withdraw_enabled=true,
