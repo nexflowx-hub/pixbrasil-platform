@@ -7,6 +7,7 @@ import {
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import type { AdminContext } from "../auth/admin-auth.types";
 import { DatabaseService } from "../database/database.service";
+import { FinancialCoreService } from "../financial-core/financial-core.service";
 import { ProviderAdapterRegistry } from "../providers/provider-adapter.registry";
 
 interface GatewayConnectionRow {
@@ -40,6 +41,7 @@ export class AdminService {
   constructor(
     private readonly database: DatabaseService,
     private readonly providers: ProviderAdapterRegistry,
+    private readonly financial: FinancialCoreService,
   ) {}
 
   async listProviders() {
@@ -1019,6 +1021,90 @@ export class AdminService {
       `,
     );
     return { success: true, data: result.rows };
+  }
+
+  async updatePayoutStatus(
+    payoutId: string,
+    body: Record<string, unknown>,
+    admin: AdminContext,
+  ) {
+    const status = requiredString(body.status, "status").toUpperCase();
+    const allowed = [
+      "PROCESSING",
+      "PAID",
+      "CONFIRMED",
+      "REJECTED",
+      "CANCELED",
+      "FAILED",
+    ];
+    if (!allowed.includes(status)) {
+      throw new BadRequestException("Unsupported payout status transition.");
+    }
+
+    const externalReference = String(body.externalReference ?? "").trim();
+    const proof =
+      body.proofMetadata &&
+      typeof body.proofMetadata === "object" &&
+      !Array.isArray(body.proofMetadata)
+        ? (body.proofMetadata as Record<string, unknown>)
+        : {};
+
+    let result: { id: string; status: string } | null = null;
+
+    if (status === "PROCESSING") {
+      result = await this.financial.setPayoutProcessing(
+        payoutId,
+        externalReference || undefined,
+      );
+    } else if (status === "PAID") {
+      if (!externalReference) {
+        throw new BadRequestException(
+          "externalReference is required when marking a payout PAID.",
+        );
+      }
+      result = await this.financial.markPayoutPaid(
+        payoutId,
+        externalReference,
+        {
+          ...proof,
+          confirmedByAdminUserId: admin.authUserId,
+          channel: "MANUAL_TICKET",
+        },
+      );
+    } else if (status === "CONFIRMED") {
+      result = await this.financial.confirmPayout(payoutId);
+    } else {
+      result = await this.financial.cancelPayout(
+        payoutId,
+        status as "REJECTED" | "CANCELED" | "FAILED",
+      );
+    }
+
+    if (!result) {
+      throw new ConflictException(
+        "Payout transition is not valid for the current state or wallet balance.",
+      );
+    }
+
+    await this.database.query(
+      `
+      insert into public.audit_logs(
+        id,actor_type,actor_user_id,action,resource_type,resource_id,
+        before,after,metadata,created_at
+      )
+      values(
+        gen_random_uuid(),'ADMIN',$1::uuid,'PAYOUT_STATUS_UPDATED',
+        'payout_request',$2::text,
+        '{}'::jsonb,
+        jsonb_build_object('status',$3::text),
+        jsonb_build_object('channel','MANUAL_TICKET'),
+        now()
+      )
+      `,
+      [admin.authUserId, payoutId, status],
+    );
+
+    return { success: true, data: result };
   }
 
   async usersOverview() {
