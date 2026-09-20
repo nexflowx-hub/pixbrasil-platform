@@ -20,6 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
+import { BusinessDashboard, type BusinessPortalOverview } from "@/components/client/business-dashboard";
 
 type AccountAccess = {
   accountId: string;
@@ -83,20 +84,8 @@ type OverviewPayload = {
       provider_reference: string | null;
       created_at: string;
     }>;
-    business: null | {
-      merchant: {
-        merchant_id: string;
-        trade_name: string | null;
-        merchant_status: string;
-        tier_code: string;
-      };
-      stores: Array<Record<string, unknown>>;
-      payments: Array<Record<string, unknown>>;
-    };
-    capabilities: {
-      financialWritesEnabled: boolean;
-      note: string;
-    };
+    business: BusinessPortalOverview["business"];
+    capabilities: BusinessPortalOverview["capabilities"];
   };
 };
 
@@ -225,7 +214,7 @@ export function ClientPortal() {
           <BrandLogo className="text-[18px]" />
           <div className="flex items-center gap-2">
             <span className="hidden rounded-full border border-[#20F29A]/18 bg-[#20F29A]/5 px-3 py-1.5 text-[9px] font-bold tracking-[.12em] text-[#72D5B5] sm:inline-flex">
-              MVP CONTROLADO
+              PRODUÇÃO
             </span>
             <button onClick={signOut} className="flex h-9 items-center gap-2 rounded-xl border border-white/10 px-3 text-[10px] text-[#92A9A3] hover:border-white/20 hover:text-white">
               <LogOut className="h-3.5 w-3.5" /> Sair
@@ -280,7 +269,7 @@ export function ClientPortal() {
             </div>
 
             <div className="mt-4 border-t border-white/7 px-3 pt-4 text-[9px] leading-5 text-[#607871]">
-              Operações de entrada, saída e câmbio permanecem bloqueadas no MVP enquanto os rails financeiros são validados.
+              Conta ligada ao PiXBrasil Financial Core. Cobranças PIX seguem o routing configurado; payouts são processados por ticket de Tesouraria.
             </div>
           </aside>
 
@@ -313,58 +302,35 @@ export function ClientPortal() {
               <div className="rounded-2xl border border-red-400/18 bg-red-400/5 p-4 text-[11px] text-red-200">{error}</div>
             ) : null}
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                ["Estado", overview?.account.status || "…", ShieldCheck],
-                ["KYC", overview?.account.kyc_status || "…", KeyRound],
-                ["Base", overview?.account.base_currency || "…", CircleDollarSign],
-                ["Perfil", overview?.account.identity_level || "…", Layers3],
-              ].map(([label, value, Icon]) => (
-                <div key={String(label)} className="rounded-2xl border border-white/8 bg-[#061214] p-4">
-                  <div className="flex items-center justify-between text-[#647E76]">
-                    <span className="text-[8px] font-bold uppercase tracking-[.14em]">{String(label)}</span>
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <strong className="mt-4 block text-[15px] tracking-[-.02em]">{String(value)}</strong>
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-2xl border border-[#D2A34E]/18 bg-[#D2A34E]/5 p-4">
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#D2A34E]" />
-                <div>
-                  <strong className="text-[11px] text-[#E2C47D]">Modo financeiro protegido</strong>
-                  <p className="mt-1 text-[9px] leading-5 text-[#8D826A]">
-                    {overview?.capabilities.note || "Leituras operacionais disponíveis; writes financeiros bloqueados."}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <section className="grid gap-3 lg:grid-cols-3">
-              {[
-                ["Receber", ArrowDownToLine],
-                ["Enviar", ArrowUpFromLine],
-                ["Converter", ArrowRight],
-              ].map(([label, Icon]) => (
-                <button key={String(label)} disabled className="flex min-h-20 cursor-not-allowed items-center gap-3 rounded-2xl border border-white/7 bg-white/[.018] px-4 text-left opacity-55">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[.035] text-[#607871]">
-                    <Icon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <strong className="block text-[10px]">{String(label)}</strong>
-                    <span className="mt-1 block text-[8px] text-[#607871]">Disponível após ativação</span>
-                  </div>
-                </button>
-              ))}
-            </section>
-
             {activeAccess?.accountType === "INDIVIDUAL" ? (
-              <PersonalView overview={overview} busy={busy} />
+              <>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    ["Estado", overview?.account.status || "…", ShieldCheck],
+                    ["KYC", overview?.account.kyc_status || "…", KeyRound],
+                    ["Base", overview?.account.base_currency || "…", CircleDollarSign],
+                    ["Perfil", overview?.account.identity_level || "…", Layers3],
+                  ].map(([label, value, Icon]) => (
+                    <div key={String(label)} className="rounded-2xl border border-white/8 bg-[#061214] p-4">
+                      <div className="flex items-center justify-between text-[#647E76]">
+                        <span className="text-[8px] font-bold uppercase tracking-[.14em]">{String(label)}</span>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <strong className="mt-4 block text-[15px] tracking-[-.02em]">{String(value)}</strong>
+                    </div>
+                  ))}
+                </div>
+                <PersonalView overview={overview} busy={busy} />
+              </>
             ) : (
-              <BusinessView overview={overview} busy={busy} />
+              <BusinessDashboard
+                overview={overview}
+                accountId={accountId}
+                busy={busy}
+                onRefresh={() => loadOverview(accountId)}
+              />
             )}
+
           </section>
         </div>
       </div>
@@ -400,66 +366,6 @@ function PersonalView({ overview, busy }: { overview: OverviewPayload["data"] | 
 
       <Panel title="Atividade" subtitle="Últimas transações do Financial Core" icon={Activity}>
         <TransactionList transactions={overview?.transactions || []} />
-      </Panel>
-    </>
-  );
-}
-
-function BusinessView({ overview, busy }: { overview: OverviewPayload["data"] | null; busy: boolean }) {
-  const business = overview?.business;
-  return (
-    <>
-      <Panel title="Stores" subtitle="Routing e liberação por operação" icon={Store}>
-        {busy && !overview ? <Loading /> : business?.stores?.length ? (
-          <div className="grid gap-2 xl:grid-cols-2">
-            {business.stores.map((store, index) => (
-              <div key={String(store.id ?? index)} className="rounded-2xl border border-white/7 bg-[#030D0F] p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <strong className="text-[12px]">{String(store.name ?? store.code ?? "Store")}</strong>
-                    <span className="mt-1 block text-[8px] uppercase tracking-[.1em] text-[#607871]">{String(store.code ?? "—")}</span>
-                  </div>
-                  <span className="rounded-full border border-[#20F29A]/18 bg-[#20F29A]/5 px-2 py-1 text-[7px] text-[#78D5B8]">{String(store.routing_mode ?? "—")}</span>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 text-[8px]">
-                  <Fact label="Provider" value={String(store.provider_code ?? "—")} />
-                  <Fact label="Gateway" value={String(store.gateway_alias ?? "—")} />
-                  <Fact label="Release" value={String(store.release_profile ?? "—")} />
-                  <Fact label="Class" value={String(store.release_class ?? "—")} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : <Empty label="Nenhuma Store vinculada a esta conta." />}
-      </Panel>
-
-      <Panel title="PIX Activity" subtitle="PaymentIntents recentes do merchant" icon={GitBranch}>
-        {business?.payments?.length ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-left text-[9px]">
-              <thead className="text-[#607871]">
-                <tr className="border-b border-white/8">
-                  <th className="px-3 py-3 font-semibold">Reference</th>
-                  <th className="px-3 py-3 font-semibold">Store</th>
-                  <th className="px-3 py-3 font-semibold">Amount</th>
-                  <th className="px-3 py-3 font-semibold">Status</th>
-                  <th className="px-3 py-3 font-semibold">Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {business.payments.map((payment, index) => (
-                  <tr key={String(payment.id ?? index)} className="border-b border-white/5 text-[#9CB0AA]">
-                    <td className="px-3 py-3">{String(payment.external_reference ?? "—")}</td>
-                    <td className="px-3 py-3">{String(payment.store_code ?? "—")}</td>
-                    <td className="px-3 py-3">{String(payment.amount ?? "—")} {String(payment.currency ?? "")}</td>
-                    <td className="px-3 py-3">{String(payment.status ?? "—")}</td>
-                    <td className="px-3 py-3">{payment.created_at ? new Date(String(payment.created_at)).toLocaleString("pt-BR") : "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : <Empty label="Nenhum PaymentIntent criado ainda." />}
       </Panel>
     </>
   );
