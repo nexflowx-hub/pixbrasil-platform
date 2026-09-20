@@ -124,6 +124,7 @@ export class WebhooksService {
           payment,
         );
       }
+      await this.markProviderEventReconciled(persisted.eventId);
     }
 
     return {
@@ -254,6 +255,7 @@ export class WebhooksService {
           payment,
         );
       }
+      await this.markProviderEventReconciled(persisted.eventId);
     }
 
     return {
@@ -344,7 +346,114 @@ export class WebhooksService {
       ],
     );
 
-    return { replay: !inserted.rows[0] };
+    const eventId =
+      inserted.rows[0]?.id ??
+      (
+        await this.database.query<{ id: string }>(
+          `
+          select id
+          from pixbrasil.provider_webhook_events
+          where gateway_connection_id=$1::uuid
+            and provider_event_key=$2::text
+          limit 1
+          `,
+          [input.connectionId, input.eventKey],
+        )
+      ).rows[0]?.id ??
+      null;
+
+    return { replay: !inserted.rows[0], eventId };
+  }
+
+  async reconcilePendingVerifiedEvents() {
+    const events = await this.database.query<{
+      id: string;
+      gateway_connection_id: string;
+      provider_code: string;
+      payload: Record<string, unknown>;
+    }>(
+      `
+      select
+        e.id,
+        e.gateway_connection_id,
+        p.code as provider_code,
+        e.payload
+      from pixbrasil.provider_webhook_events e
+      join pixbrasil.gateway_connections gc on gc.id=e.gateway_connection_id
+      join public.providers p on p.id=gc.provider_id
+      where e.status='PROCESSED'
+        and e.received_at >= now() - interval '24 hours'
+      order by e.received_at asc
+      limit 100
+      `,
+    );
+
+    let reconciled = 0;
+    for (const event of events.rows) {
+      const payload = event.payload ?? {};
+      const providerCode = event.provider_code.toUpperCase();
+      const providerPaymentId =
+        providerCode === "MISTICPAY"
+          ? String(payload.transactionId ?? "").trim()
+          : String(payload.paymentId ?? "").trim();
+      const verifiedStatus = String(payload.verifiedStatus ?? "").toUpperCase();
+
+      if (
+        !providerPaymentId ||
+        !["PENDING", "SUCCEEDED", "FAILED", "CANCELED", "REFUNDED"].includes(
+          verifiedStatus,
+        )
+      ) {
+        continue;
+      }
+
+      const payment = await this.applyVerifiedPaymentStatus(
+        event.gateway_connection_id,
+        providerPaymentId,
+        verifiedStatus as NormalizedProviderStatus,
+        providerCode,
+      );
+      if (!payment) continue;
+
+      if (verifiedStatus === "SUCCEEDED") {
+        await this.financial.postPaymentSuccess(
+          payment.paymentIntentId,
+          providerCode,
+          providerPaymentId,
+          payload,
+        );
+      } else if (
+        verifiedStatus === "CANCELED" ||
+        verifiedStatus === "REFUNDED"
+      ) {
+        await this.financial.reversePayment(
+          payment.paymentIntentId,
+          providerCode + "_" + verifiedStatus,
+        );
+      }
+
+      await this.merchantWebhooks.deliverPaymentEvent(
+        this.toMerchantEventType(payment.status),
+        payment,
+      );
+      await this.markProviderEventReconciled(event.id);
+      reconciled += 1;
+    }
+
+    return reconciled;
+  }
+
+  private async markProviderEventReconciled(eventId: string | null) {
+    if (!eventId) return;
+    await this.database.query(
+      `
+      update pixbrasil.provider_webhook_events
+      set status='RECONCILED',
+          processed_at=coalesce(processed_at,now())
+      where id=$1::uuid
+      `,
+      [eventId],
+    );
   }
 
   private async applyVerifiedPaymentStatus(
