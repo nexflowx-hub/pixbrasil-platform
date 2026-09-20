@@ -20,6 +20,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
+import { BusinessDashboard, type BusinessDashboardOverview } from "@/components/client/business-dashboard";
 
 type AccountAccess = {
   accountId: string;
@@ -218,6 +219,22 @@ export function ClientPortal() {
     router.refresh();
   }
 
+  if (activeAccess?.accountType === "BUSINESS") {
+    return (
+      <BusinessDashboard
+        email={session?.email ?? ""}
+        accountId={accountId}
+        role={activeAccess.role}
+        merchantName={activeAccess.merchant?.trade_name ?? "Conta Business"}
+        overview={overview as unknown as BusinessDashboardOverview | null}
+        busy={busy}
+        error={error}
+        onRefresh={() => void loadOverview(accountId)}
+        onSignOut={() => void signOut()}
+      />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#020B0D] text-[#F4F1E8]">
       <div className="sticky top-0 z-40 border-b border-white/8 bg-[#020B0D]/90 backdrop-blur-xl">
@@ -225,7 +242,7 @@ export function ClientPortal() {
           <BrandLogo className="text-[18px]" />
           <div className="flex items-center gap-2">
             <span className="hidden rounded-full border border-[#20F29A]/18 bg-[#20F29A]/5 px-3 py-1.5 text-[9px] font-bold tracking-[.12em] text-[#72D5B5] sm:inline-flex">
-              MVP CONTROLADO
+              PIxBRASIL PERSONAL
             </span>
             <button onClick={signOut} className="flex h-9 items-center gap-2 rounded-xl border border-white/10 px-3 text-[10px] text-[#92A9A3] hover:border-white/20 hover:text-white">
               <LogOut className="h-3.5 w-3.5" /> Sair
@@ -280,7 +297,7 @@ export function ClientPortal() {
             </div>
 
             <div className="mt-4 border-t border-white/7 px-3 pt-4 text-[9px] leading-5 text-[#607871]">
-              Operações de entrada, saída e câmbio permanecem bloqueadas no MVP enquanto os rails financeiros são validados.
+              Conta Personal com wallets e atividade consolidadas. Novos produtos são disponibilizados conforme elegibilidade da conta.
             </div>
           </aside>
 
@@ -334,9 +351,9 @@ export function ClientPortal() {
               <div className="flex items-start gap-3">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#D2A34E]" />
                 <div>
-                  <strong className="text-[11px] text-[#E2C47D]">Modo financeiro protegido</strong>
+                  <strong className="text-[11px] text-[#E2C47D]">Estado operacional</strong>
                   <p className="mt-1 text-[9px] leading-5 text-[#8D826A]">
-                    {overview?.capabilities.note || "Leituras operacionais disponíveis; writes financeiros bloqueados."}
+                    {overview?.capabilities.note || "Dados financeiros sincronizados com o Core PiXBrasil."}
                   </p>
                 </div>
               </div>
@@ -354,7 +371,7 @@ export function ClientPortal() {
                   </div>
                   <div>
                     <strong className="block text-[10px]">{String(label)}</strong>
-                    <span className="mt-1 block text-[8px] text-[#607871]">Disponível após ativação</span>
+                    <span className="mt-1 block text-[8px] text-[#607871]">Consultar disponibilidade</span>
                   </div>
                 </button>
               ))}
