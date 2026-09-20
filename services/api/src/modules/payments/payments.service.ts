@@ -755,7 +755,7 @@ export class PaymentsService {
           name: config.store_name,
         },
         routing: {
-          mode: row.metadata?.routingMode ?? "SHADOW",
+          mode: "SHADOW",
           policy: config.policy_name,
           policyVersion: config.policy_version,
           providerCode: selectedRow.provider_code,
