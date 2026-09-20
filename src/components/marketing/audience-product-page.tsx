@@ -21,16 +21,16 @@ type Audience = "personal" | "business";
 const content = {
   personal: {
     eyebrow: "PIXBRASIL PERSONAL",
-    title: "Visibilidade primeiro. Movimentação quando o rail estiver pronto.",
+    title: "Wallets e atividade financeira numa única conta.",
     description:
-      "O Client Portal reúne conta, KYC, wallets e atividade numa interface única. No MVP, a experiência é read-only para contas convidadas enquanto recebimentos, câmbio e withdrawals concluem validação operacional.",
+      "O Client Portal reúne identidade, wallets, saldos e atividade numa interface única. Produtos adicionais são disponibilizados por perfil e elegibilidade.",
     icon: UserRound,
     capabilities: [
       ["Client Portal autenticado", "AVAILABLE", "Sessão HttpOnly e account overview real."],
-      ["Wallets multiativos", "AVAILABLE", "Saldos por ativo e rede, sem conversão fictícia."],
-      ["Receber via PIX", "VALIDATING", "Rail financeiro ainda bloqueado para contas Personal."],
-      ["Enviar / Withdraw", "VALIDATING", "Disponível somente após payout e settlement guardrails."],
-      ["Conversão", "PLANNED", "Sem FX sintético no MVP."],
+      ["Wallets multiativos", "AVAILABLE", "Saldos por ativo e rede com estados separados."],
+      ["Visão financeira", "AVAILABLE", "Saldos e movimentações consultados diretamente no Financial Core."],
+      ["Receber via PIX", "PLANNED", "Disponibilidade conforme produto Personal contratado."],
+      ["Conversão", "PLANNED", "Disponibilidade conforme ativo, rede e política da conta."],
     ],
     highlights: [
       [WalletCards, "Wallets transparentes", "Disponível, pending, reserved e blocked separados por ativo."],
@@ -40,16 +40,16 @@ const content = {
   },
   business: {
     eyebrow: "PIXBRASIL BUSINESS",
-    title: "Uma camada de controle para PIX, Stores e routing.",
+    title: "PIX, Stores, routing e Wallet BRL num único control plane.",
     description:
-      "Empresas visualizam Stores, provider selecionado, classe de liberação e PaymentIntents no mesmo portal. A API S2S está disponível no piloto SHADOW; execução PIX live continua protegida por kill-switch.",
+      "Empresas recebem PIX via API S2S, acompanham provider e classe de liberação por Store e centralizam o saldo disponível para payout.",
     icon: Building2,
     capabilities: [
-      ["Client Portal Business", "AVAILABLE", "Account switch e visão merchant/store real."],
+      ["Client Portal Business", "AVAILABLE", "Wallet BRL, Stores, liberações, gateways e cashflow."],
       ["Stores e routing", "AVAILABLE", "Provider, gateway, D0/D1 e release profile por Store."],
-      ["API PIX S2S", "SHADOW", "PaymentIntent e routing decision sem movimentar fundos."],
-      ["PIX live", "VALIDATING", "Aguardando create → webhook → settlement validado."],
-      ["Payouts", "VALIDATING", "Manual/automatic payout permanecem feature-flagged."],
+      ["API PIX S2S", "AVAILABLE", "Criação de PIX real com idempotência e QR retornado pelo provider."],
+      ["Webhooks", "AVAILABLE", "Confirmação verificada antes de settlement e merchant fulfillment."],
+      ["Payouts", "AVAILABLE", "Pedidos via ticket manual nesta fase; automação entra em seguida."],
     ],
     highlights: [
       [Store, "Store-scoped", "Cada operação pode ter provider, custos e release diferentes."],
@@ -93,8 +93,8 @@ export function AudienceProductPage({ audience }: { audience: Audience }) {
           <div className="rounded-[28px] border border-white/9 bg-[#061416]/92 p-5 shadow-[0_30px_100px_rgba(0,0,0,.28)] sm:p-6">
             <div className="flex items-center justify-between border-b border-white/7 pb-4">
               <div>
-                <span className="text-[9px] uppercase tracking-[.14em] text-[#607970]">Capability matrix</span>
-                <strong className="mt-1 block text-[14px]">Estado do MVP</strong>
+                <span className="text-[9px] uppercase tracking-[.14em] text-[#607970]">Capacidades</span>
+                <strong className="mt-1 block text-[14px]">Estado operacional</strong>
               </div>
               <ShieldCheck className="h-5 w-5 text-[#20F29A]" />
             </div>
@@ -130,9 +130,9 @@ export function AudienceProductPage({ audience }: { audience: Audience }) {
           <div className="rounded-[26px] border border-[#D2A34E]/16 bg-[#D2A34E]/4 p-6 sm:flex sm:items-center sm:justify-between sm:gap-8">
             <div>
               <span className="text-[9px] font-bold uppercase tracking-[.14em] text-[#C7A95A]">TRANSPARÊNCIA OPERACIONAL</span>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-.04em]">Nenhuma feature é chamada de “ativa” antes de estar operacional.</h2>
+              <h2 className="mt-2 text-2xl font-semibold tracking-[-.04em]">Capacidades financeiras com estado operacional explícito.</h2>
               <p className="mt-3 max-w-3xl text-[10px] leading-5 text-[#8D826A]">
-                O PiXBrasil distingue interface disponível, rail em SHADOW, capacidade em validação e função planejada. Isso também aparece no portal e no Control Plane.
+                O PiXBrasil separa claramente disponibilidade de produto, estado do provider, liberação de fundos e payout em todas as superfícies.
               </p>
             </div>
             <Link href="/how-it-works" className="mt-5 inline-flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[#D2A34E] sm:mt-0">
