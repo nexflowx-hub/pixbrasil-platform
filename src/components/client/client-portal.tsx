@@ -242,7 +242,7 @@ export function ClientPortal() {
           <BrandLogo className="text-[18px]" />
           <div className="flex items-center gap-2">
             <span className="hidden rounded-full border border-[#20F29A]/18 bg-[#20F29A]/5 px-3 py-1.5 text-[9px] font-bold tracking-[.12em] text-[#72D5B5] sm:inline-flex">
-              PIxBRASIL PERSONAL
+              PIXBRASIL PERSONAL
             </span>
             <button onClick={signOut} className="flex h-9 items-center gap-2 rounded-xl border border-white/10 px-3 text-[10px] text-[#92A9A3] hover:border-white/20 hover:text-white">
               <LogOut className="h-3.5 w-3.5" /> Sair
