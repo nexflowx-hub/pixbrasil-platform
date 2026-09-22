@@ -102,6 +102,11 @@ export function DeveloperCenter(props: {
         | DeveloperPayload
         | { message?: string };
       if (!response.ok || !("data" in body)) {
+        if (response.status === 404) {
+          throw new Error(
+            "Integrações temporariamente indisponíveis. Tente novamente em instantes.",
+          );
+        }
         throw new Error(
           "message" in body && body.message
             ? body.message
