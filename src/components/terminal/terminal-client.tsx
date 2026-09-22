@@ -85,6 +85,7 @@ export function TerminalClient() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [storeCode, setStoreCode] = useState("");
   const [terminalName, setTerminalName] = useState("Caixa 1");
+  const [terminalId, setTerminalId] = useState("");
   const [amountCents, setAmountCents] = useState("0");
   const [payerName] = useState("Cliente");
   const [payerTaxId, setPayerTaxId] = useState("");
@@ -139,6 +140,10 @@ export function TerminalClient() {
     void Promise.resolve().then(async () => {
       const storedTerminal = localStorage.getItem("pixbrasil:terminal:name");
       if (active && storedTerminal) setTerminalName(storedTerminal);
+      const storedTerminalId =
+        localStorage.getItem("pixbrasil:terminal:id") || crypto.randomUUID();
+      localStorage.setItem("pixbrasil:terminal:id", storedTerminalId);
+      if (active) setTerminalId(storedTerminalId);
 
       try {
         const response = await fetch("/api/client/session", {
@@ -287,9 +292,7 @@ export function TerminalClient() {
               taxId: digits(payerTaxId),
             },
             terminal: {
-              id:
-                localStorage.getItem("pixbrasil:terminal:id") ||
-                "mobile-" + terminalName.toLowerCase().replace(/\W+/g, "-"),
+              id: terminalId || "mobile",
               name: terminalName,
             },
           }),
