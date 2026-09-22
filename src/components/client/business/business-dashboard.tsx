@@ -330,7 +330,7 @@ function BusinessTopbar(props: {
         <input
           value={props.searchQuery}
           onChange={(event) => props.setSearchQuery(event.target.value)}
-          placeholder="Buscar transações, stores, referências, tickets..."
+          placeholder="Buscar Stores, pagamentos ou referências..."
           className="h-11 w-full rounded-[10px] border border-[#DCE6E2] bg-[#FAFCFB] pl-11 pr-16 text-[13px] text-[#172821] outline-none transition focus:border-[#14C98C] focus:ring-4 focus:ring-[#14C98C]/8"
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-[#DEE6E3] bg-white px-2 py-1 text-[10px] font-semibold text-[#7A8B86]">
@@ -406,20 +406,20 @@ function BusinessTopbar(props: {
                 </strong>
                 <span className="text-[10px] text-[#82938D]">Conta Business</span>
               </div>
-              {["Minha conta", "Equipe", "Segurança", "Preferências"].map(
-                (label) => (
-                  <button
-                    key={label}
-                    onClick={() => {
-                      props.setProfileOpen(false);
-                      scrollToSection("account");
-                    }}
-                    className="flex h-9 w-full items-center rounded-lg px-3 text-left text-[11px] hover:bg-[#F4F8F6]"
-                  >
-                    {label}
-                  </button>
-                )
-              )}
+              <a
+                href="/support"
+                onClick={() => props.setProfileOpen(false)}
+                className="flex h-9 w-full items-center rounded-lg px-3 text-left text-[11px] hover:bg-[#F4F8F6]"
+              >
+                Central de ajuda
+              </a>
+              <a
+                href="/docs"
+                onClick={() => props.setProfileOpen(false)}
+                className="flex h-9 w-full items-center rounded-lg px-3 text-left text-[11px] hover:bg-[#F4F8F6]"
+              >
+                Documentação
+              </a>
               <button
                 onClick={() => void props.signOut()}
                 className="mt-1 flex h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-[11px] text-red-600 hover:bg-red-50"
@@ -588,21 +588,20 @@ function BusinessWalletHero(props: {
           </strong>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            <a
-              href="/docs/api"
-              className="flex h-10 items-center gap-2 rounded-lg bg-[#14E6A1] px-4 text-[11px] font-extrabold text-[#032018] transition hover:bg-[#34F0B1]"
-              title="Abrir integração para receber PIX"
-            >
-              <ArrowDownToLine className="h-3.5 w-3.5" />
-              Receber PIX
-            </a>
             <button
               onClick={() => scrollToSection("payments")}
+              className="flex h-10 items-center gap-2 rounded-lg bg-[#14E6A1] px-4 text-[11px] font-extrabold text-[#032018] transition hover:bg-[#34F0B1]"
+            >
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              Ver recebimentos
+            </button>
+            <a
+              href="/docs/api"
               className="flex h-10 items-center gap-2 rounded-lg border border-white/30 px-4 text-[11px] font-semibold hover:bg-white/5"
             >
-              <CreditCard className="h-3.5 w-3.5" />
-              Pagamentos PIX
-            </button>
+              <Code2 className="h-3.5 w-3.5" />
+              Integração API
+            </a>
             <button
               onClick={props.onPayout}
               className="flex h-10 items-center gap-2 rounded-lg border border-white/30 px-4 text-[11px] font-semibold hover:bg-white/5"
@@ -993,9 +992,9 @@ function QuickActions(props: {
             <CreditCard className="h-4 w-4" />
           </span>
           <div>
-            <strong className="block text-[11px]">Receber PIX</strong>
+            <strong className="block text-[11px]">Integração PIX</strong>
             <span className="mt-1 block text-[9px] text-[#70837C]">
-              Integração e cobrança via API
+              API, cobrança e exemplos
             </span>
           </div>
         </a>
@@ -1275,7 +1274,9 @@ function BusinessSidebar(props: {
               {props.activeAccess.role} · {compactId(props.accountId)}
             </span>
           </div>
-          <ChevronDown className="h-3.5 w-3.5 text-[#71958B]" />
+          {(props.session?.accounts.length ?? 0) > 1 ? (
+            <ChevronDown className="h-3.5 w-3.5 text-[#71958B]" />
+          ) : null}
         </div>
 
         {(props.session?.accounts.length ?? 0) > 1 ? (
@@ -1346,14 +1347,14 @@ function BusinessSidebar(props: {
 
       <div className="mt-7 rounded-xl border border-[#145546] bg-[linear-gradient(145deg,#06251F,#07342C)] p-4">
         <strong className="block max-w-[140px] text-[12px] leading-5">
-          O PIX que impulsiona o seu negócio.
+          Controle financeiro para crescer.
         </strong>
         <p className="mt-4 text-[10px] leading-4 text-[#8EB2A8]">
-          Mais vendas.
+          Pagamentos PIX.
           <br />
-          Mais liberdade.
+          Liberações por Store.
           <br />
-          Mais crescimento.
+          Wallet BRL e payouts.
         </p>
         <div className="mt-5 h-1 w-10 rounded-full bg-[#14E6A1]" />
       </div>
@@ -1401,7 +1402,7 @@ function Status({ value }: { value: string }) {
   return (
     <span
       className={
-        "inline-flex rounded-full border px-2 py-1 text-[9px] font-bold " +
+        "inline-flex items-center rounded-full border px-2.5 py-1 text-[9px] font-bold " +
         statusTone(value)
       }
     >
