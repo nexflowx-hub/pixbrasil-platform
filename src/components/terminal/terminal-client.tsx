@@ -78,6 +78,25 @@ function paymentFailed(status: string) {
   );
 }
 
+function terminalStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    SUCCEEDED: "Concluído",
+    PAID: "Pago",
+    CONFIRMED: "Confirmado",
+    AVAILABLE: "Disponível",
+    PENDING: "Pendente",
+    PENDING_PAYMENT: "Aguardando",
+    CREATED: "Criado",
+    PROCESSING: "Processando",
+    RECONCILIATION_REQUIRED: "A confirmar",
+    FAILED: "Falhou",
+    REJECTED: "Rejeitado",
+    CANCELED: "Cancelado",
+    EXPIRED: "Expirado",
+  };
+  return labels[status.toUpperCase()] || status;
+}
+
 export function TerminalClient() {
   const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
@@ -689,7 +708,7 @@ export function TerminalClient() {
                             statusTone(row.status)
                           }
                         >
-                          {row.status}
+                          {terminalStatusLabel(row.status)}
                         </span>
                       </div>
                     </div>
