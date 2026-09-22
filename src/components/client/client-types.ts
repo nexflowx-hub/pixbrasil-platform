@@ -33,14 +33,8 @@ export type StoreRow = {
   name: string;
   status: string;
   currency: string;
-  gateway_alias: string | null;
-  provider_code: string | null;
-  provider_health: string | null;
-  latency_ms: number | null;
   release_profile: string | null;
   release_class: string | null;
-  route_cost_profile: string | null;
-  routing_mode: string | null;
   available_brl: string;
   pending_brl: string;
   total_net_brl: string;
@@ -55,8 +49,6 @@ export type PaymentRow = {
   status: string;
   payment_method: string;
   store_code: string | null;
-  provider_code: string | null;
-  provider_payment_id: string | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;
@@ -89,17 +81,6 @@ export type SettlementRow = {
   created_at: string;
 };
 
-export type ProviderHealth = {
-  provider_code: string;
-  gateway_alias: string;
-  health: string;
-  latency_ms: number | null;
-  tested_at: string | null;
-  attempts_30d: number;
-  successes_30d: number;
-  success_rate_30d: string | null;
-};
-
 export type CashflowRow = {
   day: string;
   incoming_brl: string;
@@ -123,7 +104,12 @@ export type BusinessData = {
   payments: PaymentRow[];
   payouts: PayoutRow[];
   settlements: SettlementRow[];
-  providerHealth: ProviderHealth[];
+  operations: {
+    pixStatus: "OPERATIONAL" | "DEGRADED" | "UNAVAILABLE" | "UNKNOWN";
+    payments30d: number;
+    successful30d: number;
+    successRate30d: string | null;
+  };
   cashflow: CashflowRow[];
 };
 
@@ -159,7 +145,6 @@ export type OverviewData = {
     status: string;
     amount: string;
     symbol: string;
-    provider_reference: string | null;
     created_at: string;
   }>;
   business: BusinessData | null;
@@ -168,9 +153,7 @@ export type OverviewData = {
     depositsEnabled: boolean;
     withdrawalsEnabled: boolean;
     exchangeEnabled: boolean;
-    payoutMode?: string;
-    payoutChannel?: string | null;
-    note: string;
+    payoutsEnabled: boolean;
   };
 };
 
