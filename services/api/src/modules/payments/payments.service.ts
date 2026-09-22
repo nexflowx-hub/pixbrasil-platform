@@ -440,7 +440,7 @@ export class PaymentsService {
     );
 
     if (!routeCostRule.rows[0]) {
-      throw new ConflictException("No active inbound route-cost rule matches this store.");
+      throw new ConflictException("Store pricing configuration is unavailable for this amount.");
     }
 
     const platformFeeRule = config.fee_profile_id
