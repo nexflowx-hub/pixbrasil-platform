@@ -16,14 +16,12 @@ import {
   FileText,
   KeyRound,
   Landmark,
-  Link2,
   ListFilter,
   LoaderCircle,
   LogOut,
   Menu,
   Search,
   Send,
-  Settings2,
   ShieldCheck,
   Store,
   WalletCards,
@@ -69,12 +67,9 @@ const NAV_ITEMS = [
   ["Stores", Store, "stores"],
   ["Pagamentos PIX", CreditCard, "payments"],
   ["Transações", Activity, "movements"],
-  ["Links de pagamento", Link2, "developers"],
   ["Liberações", CalendarDays, "releases"],
-  ["Payouts", Send, "payouts"],
-  ["Desenvolvedores", Code2, "developers"],
-  ["Relatórios", FileText, "cashflow"],
-  ["Definições", Settings2, "account"]
+  ["Payouts", Send, "payout-action"],
+  ["Relatórios", FileText, "cashflow"]
 ] as const;
 
 export function BusinessDashboard(props: BusinessDashboardProps) {
@@ -158,14 +153,15 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
   );
 
   return (
-    <main className="min-h-screen bg-[#F4F7F6] text-[#0A1614]">
-      <div className="grid min-h-screen lg:grid-cols-[240px_1fr]">
+    <main className="min-h-screen bg-[linear-gradient(180deg,#F7F9F8_0%,#F3F6F5_100%)] text-[#0A1614]">
+      <div className="grid min-h-screen lg:grid-cols-[252px_1fr]">
         <BusinessSidebar
           session={props.session}
           accountId={props.accountId}
           setAccountId={props.setAccountId}
           activeAccess={props.activeAccess}
           onNavigate={() => setMobileNavOpen(false)}
+          onPayout={() => props.setPayoutOpen(true)}
           mobile={false}
         />
 
@@ -185,8 +181,8 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
             settlements={business?.settlements ?? []}
           />
 
-          <div className="px-4 py-5 sm:px-6 lg:px-6 2xl:px-7">
-            <div className="mx-auto max-w-[1600px] space-y-3">
+          <div className="px-4 py-6 sm:px-6 lg:px-7 2xl:px-8">
+            <div className="mx-auto max-w-[1640px] space-y-4">
               <DashboardHeader
                 today={today}
                 busy={props.busy}
@@ -196,7 +192,7 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
               />
 
               {props.error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[11px] text-red-700">
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
                   {props.error}
                 </div>
               ) : null}
@@ -276,6 +272,7 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
               setAccountId={props.setAccountId}
               activeAccess={props.activeAccess}
               onNavigate={() => setMobileNavOpen(false)}
+              onPayout={() => props.setPayoutOpen(true)}
               mobile
             />
             <button
@@ -319,7 +316,7 @@ function BusinessTopbar(props: {
   settlements: SettlementRow[];
 }) {
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-[#DCE6E2] bg-white/95 px-4 backdrop-blur sm:px-5 lg:px-6">
+    <header className="sticky top-0 z-40 flex h-[68px] items-center gap-3 border-b border-[#E0E7E4] bg-white/96 px-4 shadow-[0_1px_0_rgba(18,51,42,.02)] backdrop-blur-xl sm:px-5 lg:px-7">
       <button
         onClick={props.openMobileNav}
         className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DCE6E2] text-[#27463E] lg:hidden"
@@ -334,9 +331,9 @@ function BusinessTopbar(props: {
           value={props.searchQuery}
           onChange={(event) => props.setSearchQuery(event.target.value)}
           placeholder="Buscar transações, stores, referências, tickets..."
-          className="h-10 w-full rounded-lg border border-[#DCE6E2] bg-[#FAFCFB] pl-11 pr-16 text-[11px] text-[#172821] outline-none transition focus:border-[#14C98C] focus:ring-4 focus:ring-[#14C98C]/8"
+          className="h-11 w-full rounded-[10px] border border-[#DCE6E2] bg-[#FAFCFB] pl-11 pr-16 text-[13px] text-[#172821] outline-none transition focus:border-[#14C98C] focus:ring-4 focus:ring-[#14C98C]/8"
         />
-        <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-[#DEE6E3] bg-white px-2 py-1 text-[8px] font-semibold text-[#7A8B86]">
+        <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-[#DEE6E3] bg-white px-2 py-1 text-[10px] font-semibold text-[#7A8B86]">
           Ctrl K
         </span>
       </div>
@@ -344,7 +341,7 @@ function BusinessTopbar(props: {
       <div className="ml-auto flex items-center gap-1.5 text-[#50625D] sm:gap-2">
         <a
           href="/docs"
-          className="hidden h-9 items-center gap-2 rounded-lg px-3 text-[10px] font-medium hover:bg-[#F1F6F4] sm:flex"
+          className="hidden h-9 items-center gap-2 rounded-lg px-3 text-[12px] font-medium hover:bg-[#F1F6F4] sm:flex"
         >
           <CircleHelp className="h-4 w-4" />
           Ajuda
@@ -365,7 +362,7 @@ function BusinessTopbar(props: {
           >
             <Bell className="h-4 w-4" />
             {props.activeAlerts ? (
-              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#F25D68] px-1 text-[7px] font-bold text-white">
+              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#F25D68] px-1 text-[9px] font-bold text-white">
                 {props.activeAlerts > 9 ? "9+" : props.activeAlerts}
               </span>
             ) : null}
@@ -389,14 +386,14 @@ function BusinessTopbar(props: {
             }}
             className="flex items-center gap-2 rounded-xl px-1.5 py-1.5 hover:bg-[#F1F6F4] sm:px-2"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#083A30] text-[9px] font-bold text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#083A30] text-[11px] font-bold text-white">
               {initials(props.merchantName)}
             </div>
             <div className="hidden text-left xl:block">
-              <strong className="block max-w-[150px] truncate text-[10px] text-[#12211E]">
+              <strong className="block max-w-[150px] truncate text-[12px] text-[#12211E]">
                 {props.merchantName}
               </strong>
-              <span className="text-[8px] text-[#70817C]">PiXBrasil Business</span>
+              <span className="text-[10px] text-[#70817C]">PiXBrasil Business</span>
             </div>
             <ChevronDown className="hidden h-3.5 w-3.5 sm:block" />
           </button>
@@ -404,10 +401,10 @@ function BusinessTopbar(props: {
           {props.profileOpen ? (
             <div className="absolute right-0 top-12 w-56 rounded-xl border border-[#DCE6E2] bg-white p-2 shadow-[0_18px_50px_rgba(0,0,0,.12)]">
               <div className="border-b border-[#E8EFEC] px-3 py-2.5">
-                <strong className="block truncate text-[10px]">
+                <strong className="block truncate text-[12px]">
                   {props.merchantName}
                 </strong>
-                <span className="text-[8px] text-[#82938D]">Conta Business</span>
+                <span className="text-[10px] text-[#82938D]">Conta Business</span>
               </div>
               {["Minha conta", "Equipe", "Segurança", "Preferências"].map(
                 (label) => (
@@ -417,7 +414,7 @@ function BusinessTopbar(props: {
                       props.setProfileOpen(false);
                       scrollToSection("account");
                     }}
-                    className="flex h-9 w-full items-center rounded-lg px-3 text-left text-[9px] hover:bg-[#F4F8F6]"
+                    className="flex h-9 w-full items-center rounded-lg px-3 text-left text-[11px] hover:bg-[#F4F8F6]"
                   >
                     {label}
                   </button>
@@ -425,7 +422,7 @@ function BusinessTopbar(props: {
               )}
               <button
                 onClick={() => void props.signOut()}
-                className="mt-1 flex h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-[9px] text-red-600 hover:bg-red-50"
+                className="mt-1 flex h-9 w-full items-center gap-2 rounded-lg px-3 text-left text-[11px] text-red-600 hover:bg-red-50"
               >
                 <LogOut className="h-3.5 w-3.5" />
                 Sair
@@ -450,8 +447,8 @@ function NotificationPanel(props: {
   return (
     <div className="absolute right-0 top-12 w-[330px] max-w-[88vw] rounded-xl border border-[#DCE6E2] bg-white p-3 shadow-[0_18px_50px_rgba(0,0,0,.12)]">
       <div className="flex items-center justify-between px-1 pb-2">
-        <strong className="text-[11px]">Alertas operacionais</strong>
-        <span className="rounded-full bg-[#EDF6F2] px-2 py-1 text-[8px] font-bold text-[#126B50]">
+        <strong className="text-[13px]">Alertas operacionais</strong>
+        <span className="rounded-full bg-[#EDF6F2] px-2 py-1 text-[10px] font-bold text-[#126B50]">
           {payouts.length + releases.length}
         </span>
       </div>
@@ -461,10 +458,10 @@ function NotificationPanel(props: {
             key={row.id}
             className="rounded-lg border border-[#E6ECEA] bg-[#FBFCFC] p-3"
           >
-            <span className="text-[8px] font-bold uppercase tracking-[.09em] text-[#80641E]">
+            <span className="text-[10px] font-bold uppercase tracking-[.09em] text-[#80641E]">
               Payout
             </span>
-            <strong className="mt-1 block text-[9px]">
+            <strong className="mt-1 block text-[11px]">
               {brl(row.amount)} · {row.status}
             </strong>
           </div>
@@ -474,16 +471,16 @@ function NotificationPanel(props: {
             key={row.id}
             className="rounded-lg border border-[#E6ECEA] bg-[#FBFCFC] p-3"
           >
-            <span className="text-[8px] font-bold uppercase tracking-[.09em] text-[#1765D1]">
+            <span className="text-[10px] font-bold uppercase tracking-[.09em] text-[#1765D1]">
               Liberação
             </span>
-            <strong className="mt-1 block text-[9px]">
+            <strong className="mt-1 block text-[11px]">
               {row.store_code || "Store"} · {brl(row.net_brl)}
             </strong>
           </div>
         ))}
         {!payouts.length && !releases.length ? (
-          <div className="rounded-lg border border-dashed border-[#DCE6E2] p-5 text-center text-[9px] text-[#7B8D87]">
+          <div className="rounded-lg border border-dashed border-[#DCE6E2] p-5 text-center text-[11px] text-[#7B8D87]">
             Nenhum alerta operacional.
           </div>
         ) : null}
@@ -505,16 +502,16 @@ function DashboardHeader(props: {
       className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
     >
       <div>
-        <h1 className="text-[27px] font-bold tracking-[-.045em] text-[#081512] sm:text-[30px]">
+        <h1 className="text-[32px] font-bold tracking-[-.045em] text-[#081512] sm:text-[36px]">
           Visão geral financeira
         </h1>
-        <p className="mt-1 text-[11px] text-[#6C7E79] sm:text-[12px]">
+        <p className="mt-1.5 max-w-3xl text-[13px] leading-5 text-[#6C7E79]">
           Acompanhe seus recebíveis, operações PIX e o desempenho das suas Stores em tempo real.
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex min-h-12 items-center gap-2 rounded-xl border border-[#DCE6E2] bg-white px-3 text-[9px] text-[#62756E]">
+        <div className="flex min-h-12 items-center gap-2 rounded-xl border border-[#DCE6E2] bg-white px-3 text-[11px] text-[#62756E]">
           <CalendarDays className="h-4 w-4 text-[#1C5C4C]" />
           <span>{props.today}</span>
         </div>
@@ -534,10 +531,10 @@ function DashboardHeader(props: {
             ].join(" ")}
           />
           <div>
-            <strong className="block text-[9px]">
+            <strong className="block text-[11px]">
               {props.systemHealthy ? "Sistema operacional" : "Estado operacional"}
             </strong>
-            <span className="text-[8px]">
+            <span className="text-[10px]">
               {props.pixStatus === "OPERATIONAL"
                 ? "Operação PIX normal"
                 : props.pixStatus === "DEGRADED"
@@ -552,7 +549,7 @@ function DashboardHeader(props: {
         <button
           onClick={() => void props.refresh()}
           disabled={props.busy}
-          className="flex h-12 items-center gap-2 rounded-xl border border-[#DCE6E2] bg-white px-3 text-[9px] font-semibold text-[#50625D] hover:bg-[#F7FAF9] disabled:opacity-50"
+          className="flex h-12 items-center gap-2 rounded-xl border border-[#DCE6E2] bg-white px-3 text-[11px] font-semibold text-[#50625D] hover:bg-[#F7FAF9] disabled:opacity-50"
         >
           <Activity
             className={
@@ -571,29 +568,29 @@ function BusinessWalletHero(props: {
   onPayout: () => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl bg-[radial-gradient(circle_at_96%_100%,rgba(20,230,161,.18),transparent_32%),linear-gradient(125deg,#073A30,#04251F)] p-5 text-white shadow-[0_14px_36px_rgba(5,52,42,.13)] xl:col-span-2 2xl:col-span-1">
+    <article className="overflow-hidden rounded-[16px] bg-[radial-gradient(circle_at_96%_100%,rgba(20,230,161,.18),transparent_32%),linear-gradient(125deg,#073A30,#04251F)] p-6 text-white shadow-[0_18px_44px_rgba(5,52,42,.16)] xl:col-span-2 2xl:col-span-1">
       <div className="grid h-full gap-5 md:grid-cols-[1fr_190px] md:items-center">
         <div>
-          <div className="flex items-center gap-2 text-[9px] font-bold uppercase tracking-[.11em] text-[#B7D5CD]">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.11em] text-[#B7D5CD]">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0C5748] text-[#17E7A4]">
               <WalletCards className="h-4 w-4" />
             </span>
             <span>
               Wallet BRL empresarial
-              <span className="mt-1 block text-[8px] font-medium normal-case tracking-normal text-[#8FB7AC]">
+              <span className="mt-1 block text-[10px] font-medium normal-case tracking-normal text-[#8FB7AC]">
                 Disponível para payout
               </span>
             </span>
           </div>
 
-          <strong className="mt-4 block text-[38px] font-bold tracking-[-.055em] sm:text-[42px]">
+          <strong className="mt-5 block text-[42px] font-bold tracking-[-.055em] sm:text-[48px]">
             {brl(props.available)}
           </strong>
 
           <div className="mt-5 flex flex-wrap gap-2">
             <a
               href="/docs/api"
-              className="flex h-10 items-center gap-2 rounded-lg bg-[#14E6A1] px-4 text-[9px] font-extrabold text-[#032018] transition hover:bg-[#34F0B1]"
+              className="flex h-10 items-center gap-2 rounded-lg bg-[#14E6A1] px-4 text-[11px] font-extrabold text-[#032018] transition hover:bg-[#34F0B1]"
               title="Abrir integração para receber PIX"
             >
               <ArrowDownToLine className="h-3.5 w-3.5" />
@@ -601,14 +598,14 @@ function BusinessWalletHero(props: {
             </a>
             <button
               onClick={() => scrollToSection("payments")}
-              className="flex h-10 items-center gap-2 rounded-lg border border-white/30 px-4 text-[9px] font-semibold hover:bg-white/5"
+              className="flex h-10 items-center gap-2 rounded-lg border border-white/30 px-4 text-[11px] font-semibold hover:bg-white/5"
             >
               <CreditCard className="h-3.5 w-3.5" />
               Pagamentos PIX
             </button>
             <button
               onClick={props.onPayout}
-              className="flex h-10 items-center gap-2 rounded-lg border border-white/30 px-4 text-[9px] font-semibold hover:bg-white/5"
+              className="flex h-10 items-center gap-2 rounded-lg border border-white/30 px-4 text-[11px] font-semibold hover:bg-white/5"
             >
               <ArrowUpRight className="h-3.5 w-3.5" />
               Solicitar payout
@@ -620,10 +617,10 @@ function BusinessWalletHero(props: {
           <div className="flex items-start gap-3">
             <Landmark className="mt-0.5 h-6 w-6 text-[#CEE4DE]" />
             <div>
-              <strong className="block text-[9px] leading-4">
+              <strong className="block text-[11px] leading-4">
                 Os payouts saem da Wallet BRL.
               </strong>
-              <p className="mt-2 text-[8px] leading-4 text-[#9FC2B8]">
+              <p className="mt-2 text-[10px] leading-4 text-[#9FC2B8]">
                 Os valores das Stores entram após a respectiva liberação.
               </p>
             </div>
@@ -651,7 +648,7 @@ function MetricCard(props: {
   return (
     <button
       onClick={props.onClick}
-      className="group min-h-[185px] rounded-2xl border border-[#DCE6E2] bg-white p-4 text-left shadow-[0_8px_24px_rgba(28,63,54,.035)] transition hover:-translate-y-0.5 hover:border-[#C9D8D2] hover:shadow-[0_12px_30px_rgba(28,63,54,.07)]"
+      className="group min-h-[196px] rounded-[14px] border border-[#DEE7E3] bg-white p-5 text-left shadow-[0_8px_26px_rgba(28,63,54,.045)] transition hover:-translate-y-0.5 hover:border-[#C9D8D2] hover:shadow-[0_12px_30px_rgba(28,63,54,.07)]"
     >
       <div className="flex items-center justify-between">
         <span className={"flex h-10 w-10 items-center justify-center rounded-lg " + tone}>
@@ -659,11 +656,11 @@ function MetricCard(props: {
         </span>
         <ArrowRight className="h-4 w-4 text-[#748780] transition group-hover:translate-x-1" />
       </div>
-      <strong className="mt-3 block text-[11px]">{props.label}</strong>
+      <strong className="mt-3 block text-[13px]">{props.label}</strong>
       <span className="mt-3 block text-[26px] font-bold tracking-[-.045em]">
         {props.value}
       </span>
-      <p className="mt-3 text-[9px] leading-4 text-[#71847D]">
+      <p className="mt-3 text-[11px] leading-4 text-[#71847D]">
         {props.description}
       </p>
     </button>
@@ -672,15 +669,15 @@ function MetricCard(props: {
 
 function TotalManagedCard({ value }: { value: number }) {
   return (
-    <article className="min-h-[185px] rounded-2xl border border-[#DCE6E2] bg-white p-4 shadow-[0_8px_24px_rgba(28,63,54,.035)]">
+    <article className="min-h-[196px] rounded-[14px] border border-[#DEE7E3] bg-white p-5 shadow-[0_8px_26px_rgba(28,63,54,.045)]">
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E5FAF1] text-[#109B69]">
         <BarChart3 className="h-5 w-5" />
       </div>
-      <strong className="mt-3 block text-[11px]">Total sob gestão</strong>
+      <strong className="mt-3 block text-[13px]">Total sob gestão</strong>
       <span className="mt-3 block text-[26px] font-bold tracking-[-.045em]">
         {brl(value)}
       </span>
-      <p className="mt-3 text-[9px] leading-4 text-[#71847D]">
+      <p className="mt-3 text-[11px] leading-4 text-[#71847D]">
         Wallet disponível + recebíveis a liberar + reservado.
       </p>
     </article>
@@ -697,16 +694,16 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
     >
       {stores.length ? (
         <div className="premium-scrollbar overflow-x-auto">
-          <table className="w-full min-w-[700px] text-left text-[8px]">
+          <table className="w-full min-w-[760px] text-left text-[10px]">
             <thead>
               <tr className="border-b border-[#E3EBE8] text-[#748780]">
-                <th className="px-2 py-2.5 font-semibold">Store</th>
-                <th className="px-2 py-2.5 font-semibold">Release</th>
-                <th className="px-2 py-2.5 font-semibold">Progresso</th>
-                <th className="px-2 py-2.5 font-semibold">Próxima liberação</th>
-                <th className="px-2 py-2.5 font-semibold">A liberar</th>
-                <th className="px-2 py-2.5 font-semibold">Disponível</th>
-                <th className="px-2 py-2.5 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold">Store</th>
+                <th className="px-3 py-3 font-semibold">Release</th>
+                <th className="px-3 py-3 font-semibold">Progresso</th>
+                <th className="px-3 py-3 font-semibold">Próxima liberação</th>
+                <th className="px-3 py-3 font-semibold">A liberar</th>
+                <th className="px-3 py-3 font-semibold">Disponível</th>
+                <th className="px-3 py-3 font-semibold">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -726,32 +723,32 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
                     key={store.id}
                     className="border-b border-[#EEF3F1] transition last:border-0 hover:bg-[#FAFCFB]"
                   >
-                    <td className="px-2 py-2.5">
+                    <td className="px-3 py-3">
                       <div className="flex items-center gap-2">
                         <span
                           className={[
-                            "flex h-7 w-7 items-center justify-center rounded-md text-[8px] font-bold text-white",
+                            "flex h-7 w-7 items-center justify-center rounded-md text-[10px] font-bold text-white",
                             ["bg-[#287FC7]", "bg-[#1B9BDB]", "bg-[#EE8A2B]", "bg-[#B27A39]", "bg-[#28984D]"][index % 5]
                           ].join(" ")}
                         >
                           {store.code.slice(0, 2)}
                         </span>
                         <div>
-                          <strong className="block text-[8.5px] text-[#162722]">
+                          <strong className="block text-[10px] text-[#162722]">
                             {store.name}
                           </strong>
-                          <span className="mt-0.5 block text-[7px] text-[#8B9A95]">
+                          <span className="mt-0.5 block text-[9px] text-[#8B9A95]">
                             {store.code}
                           </span>
                         </div>
                       </div>
                     </td>
-                    <td className="px-2 py-2.5">
+                    <td className="px-3 py-3">
                       <span className="rounded bg-[#EEF3F1] px-1.5 py-1 font-bold text-[#385149]">
                         {store.release_class || "—"}
                       </span>
                     </td>
-                    <td className="px-2 py-2.5">
+                    <td className="px-3 py-3">
                       <div className="flex min-w-[120px] items-center gap-2">
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#E6EFEC]">
                           <div
@@ -764,7 +761,7 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
                         </span>
                       </div>
                     </td>
-                    <td className="px-2 py-2.5 text-[#687C75]">
+                    <td className="px-3 py-3 text-[#687C75]">
                       {store.next_available_at
                         ? new Date(store.next_available_at).toLocaleString("pt-BR", {
                             day: "2-digit",
@@ -774,13 +771,13 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
                           })
                         : "—"}
                     </td>
-                    <td className="px-2 py-2.5 font-semibold">
+                    <td className="px-3 py-3 font-semibold">
                       {brl(store.pending_brl)}
                     </td>
-                    <td className="px-2 py-2.5 font-semibold">
+                    <td className="px-3 py-3 font-semibold">
                       {brl(store.available_brl)}
                     </td>
-                    <td className="px-2 py-2.5">
+                    <td className="px-3 py-3">
                       <Status value={store.status} />
                     </td>
                   </tr>
@@ -834,7 +831,7 @@ function PixOperationsPanel(props: {
         <div className="rounded-[14px] border border-[#DFE8E4] bg-[linear-gradient(145deg,#F9FCFB,#F3F8F6)] p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <span className="text-[8px] font-bold uppercase tracking-[.12em] text-[#71847D]">
+              <span className="text-[10px] font-bold uppercase tracking-[.12em] text-[#71847D]">
                 Infraestrutura PiXBrasil
               </span>
               <strong className="mt-2 block text-[15px] tracking-[-.025em] text-[#10231E]">
@@ -843,7 +840,7 @@ function PixOperationsPanel(props: {
             </div>
             <span
               className={[
-                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[8px] font-bold",
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-bold",
                 healthy
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : status === "DEGRADED"
@@ -889,7 +886,7 @@ function PixOperationsPanel(props: {
 
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
           <div className="rounded-[14px] border border-[#E1E9E6] bg-white p-4">
-            <span className="text-[8px] font-medium text-[#73867F]">
+            <span className="text-[10px] font-medium text-[#73867F]">
               Stores ativas
             </span>
             <div className="mt-2 flex items-end justify-between">
@@ -900,7 +897,7 @@ function PixOperationsPanel(props: {
             </div>
           </div>
           <div className="rounded-[14px] border border-[#E1E9E6] bg-white p-4">
-            <span className="text-[8px] font-medium text-[#73867F]">
+            <span className="text-[10px] font-medium text-[#73867F]">
               Liberações pendentes
             </span>
             <div className="mt-2 flex items-end justify-between">
@@ -913,7 +910,7 @@ function PixOperationsPanel(props: {
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#E2EAE7] bg-[#FAFCFB] px-3 py-2.5 text-[8px] text-[#6B7E77]">
+      <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#E2EAE7] bg-[#FAFCFB] px-3 py-2.5 text-[10px] text-[#6B7E77]">
         <ShieldCheck className="h-4 w-4 text-[#13956B]" />
         A infraestrutura de processamento é gerida pelo PiXBrasil. Sua conta mostra apenas o estado operacional e financeiro relevante.
       </div>
@@ -924,7 +921,7 @@ function PixOperationsPanel(props: {
 function OperationMetric(props: { label: string; value: string }) {
   return (
     <div className="px-3 first:pl-0 last:pr-0">
-      <span className="block text-[7px] text-[#7A8D86]">{props.label}</span>
+      <span className="block text-[9px] text-[#7A8D86]">{props.label}</span>
       <strong className="mt-2 block text-[18px] tracking-[-.035em] text-[#132720]">
         {props.value}
       </strong>
@@ -970,7 +967,7 @@ function PerformancePanel(props: {
               index ? "xl:border-l xl:border-[#E6EEEB]" : ""
             ].join(" ")}
           >
-            <span className="text-[7.5px] text-[#71847D]">{label}</span>
+            <span className="text-[9px] text-[#71847D]">{label}</span>
             <strong className="mt-2 block text-[15px] tracking-[-.025em]">
               {value}
             </strong>
@@ -996,8 +993,8 @@ function QuickActions(props: {
             <CreditCard className="h-4 w-4" />
           </span>
           <div>
-            <strong className="block text-[9px]">Receber PIX</strong>
-            <span className="mt-1 block text-[7px] text-[#70837C]">
+            <strong className="block text-[11px]">Receber PIX</strong>
+            <span className="mt-1 block text-[9px] text-[#70837C]">
               Integração e cobrança via API
             </span>
           </div>
@@ -1011,8 +1008,8 @@ function QuickActions(props: {
             <Store className="h-4 w-4" />
           </span>
           <div>
-            <strong className="block text-[9px]">Stores</strong>
-            <span className="mt-1 block text-[7px] text-[#70837C]">
+            <strong className="block text-[11px]">Stores</strong>
+            <span className="mt-1 block text-[9px] text-[#70837C]">
               Acompanhar recebíveis
             </span>
           </div>
@@ -1032,8 +1029,8 @@ function QuickActions(props: {
             <Send className="h-4 w-4" />
           </span>
           <div>
-            <strong className="block text-[9px]">Solicitar payout</strong>
-            <span className="mt-1 block text-[7px] text-[#70837C]">
+            <strong className="block text-[11px]">Solicitar payout</strong>
+            <span className="mt-1 block text-[9px] text-[#70837C]">
               Transferir saldo disponível
             </span>
           </div>
@@ -1047,8 +1044,8 @@ function QuickActions(props: {
             <Code2 className="h-4 w-4" />
           </span>
           <div>
-            <strong className="block text-[9px]">API & Webhooks</strong>
-            <span className="mt-1 block text-[7px] text-[#70837C]">
+            <strong className="block text-[11px]">API & Webhooks</strong>
+            <span className="mt-1 block text-[9px] text-[#70837C]">
               Integração técnica
             </span>
           </div>
@@ -1068,15 +1065,15 @@ function MovementsPanel({ movements }: { movements: Movement[] }) {
     >
       {movements.length ? (
         <div className="premium-scrollbar overflow-x-auto">
-          <table className="w-full min-w-[650px] text-left text-[8px]">
+          <table className="w-full min-w-[720px] text-left text-[10px]">
             <thead>
               <tr className="border-b border-[#E3EBE8] text-[#748780]">
-                <th className="px-2 py-2.5 font-semibold">Referência</th>
-                <th className="px-2 py-2.5 font-semibold">Origem</th>
-                <th className="px-2 py-2.5 font-semibold">Tipo</th>
-                <th className="px-2 py-2.5 font-semibold">Status</th>
-                <th className="px-2 py-2.5 font-semibold">Data</th>
-                <th className="px-2 py-2.5 text-right font-semibold">Valor</th>
+                <th className="px-3 py-3 font-semibold">Referência</th>
+                <th className="px-3 py-3 font-semibold">Origem</th>
+                <th className="px-3 py-3 font-semibold">Tipo</th>
+                <th className="px-3 py-3 font-semibold">Status</th>
+                <th className="px-3 py-3 font-semibold">Data</th>
+                <th className="px-3 py-3 text-right font-semibold">Valor</th>
               </tr>
             </thead>
             <tbody>
@@ -1085,15 +1082,15 @@ function MovementsPanel({ movements }: { movements: Movement[] }) {
                   key={row.id}
                   className="border-b border-[#EEF3F1] last:border-0"
                 >
-                  <td className="px-2 py-2.5 font-medium text-[#345F89]">
+                  <td className="px-3 py-3 font-medium text-[#345F89]">
                     {row.reference}
                   </td>
-                  <td className="px-2 py-2.5">{row.origin}</td>
-                  <td className="px-2 py-2.5">{row.type}</td>
-                  <td className="px-2 py-2.5">
+                  <td className="px-3 py-3">{row.origin}</td>
+                  <td className="px-3 py-3">{row.type}</td>
+                  <td className="px-3 py-3">
                     <Status value={row.status} />
                   </td>
-                  <td className="px-2 py-2.5 text-[#70837C]">
+                  <td className="px-3 py-3 text-[#70837C]">
                     {new Date(row.date).toLocaleString("pt-BR", {
                       day: "2-digit",
                       month: "2-digit",
@@ -1103,7 +1100,7 @@ function MovementsPanel({ movements }: { movements: Movement[] }) {
                   </td>
                   <td
                     className={[
-                      "px-2 py-2.5 text-right font-semibold",
+                      "px-3 py-3 text-right font-semibold",
                       row.direction === "outgoing"
                         ? "text-[#B5414B]"
                         : "text-[#14231F]"
@@ -1168,7 +1165,7 @@ function CashflowPanel(props: {
       icon={BarChart3}
       action={"Saldo " + brl(props.available)}
     >
-      <div className="mb-3 flex flex-wrap gap-4 text-[7px] text-[#667A73]">
+      <div className="mb-3 flex flex-wrap gap-4 text-[9px] text-[#667A73]">
         <span className="flex items-center gap-1">
           <span className="h-2 w-2 rounded-full bg-[#15DFA0]" />
           Entradas PIX
@@ -1248,32 +1245,33 @@ function BusinessSidebar(props: {
   setAccountId: (value: string) => void;
   activeAccess: AccountAccess;
   onNavigate: () => void;
+  onPayout: () => void;
   mobile: boolean;
 }) {
   return (
     <aside
       className={[
-        "min-h-screen bg-[linear-gradient(180deg,#031713_0%,#041D18_100%)] px-3 py-5 text-white",
+        "min-h-screen bg-[linear-gradient(180deg,#031713_0%,#041D18_100%)] px-3.5 py-6 text-white",
         props.mobile ? "block h-full overflow-y-auto" : "hidden lg:block"
       ].join(" ")}
     >
       <div className="px-2">
-        <BrandLogo tagline className="text-[18px]" taglineClassName="text-[6px]" />
+        <BrandLogo tagline className="text-[21px]" taglineClassName="text-[8px]" />
       </div>
 
       <div
         id="account"
-        className="mt-6 rounded-xl border border-white/10 bg-white/[.035] p-3"
+        className="mt-7 rounded-[12px] border border-white/10 bg-white/[.04] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,.025)]"
       >
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#1C5E4F] bg-[#0A3029]">
             <Building2 className="h-4 w-4 text-[#35E5A9]" />
           </div>
           <div className="min-w-0 flex-1">
-            <strong className="block truncate text-[9px]">
+            <strong className="block truncate text-[11px]">
               {props.activeAccess.merchant?.trade_name || "Business"}
             </strong>
-            <span className="mt-1 block text-[7px] text-[#71958B]">
+            <span className="mt-1 block text-[9px] text-[#71958B]">
               {props.activeAccess.role} · {compactId(props.accountId)}
             </span>
           </div>
@@ -1282,7 +1280,7 @@ function BusinessSidebar(props: {
 
         {(props.session?.accounts.length ?? 0) > 1 ? (
           <select
-            className="mt-3 h-8 w-full rounded-lg border border-white/10 bg-[#071B17] px-2 text-[8px] text-[#A9C1BA]"
+            className="mt-3 h-8 w-full rounded-lg border border-white/10 bg-[#071B17] px-2 text-[10px] text-[#A9C1BA]"
             value={props.accountId}
             onChange={(event) => props.setAccountId(event.target.value)}
           >
@@ -1302,13 +1300,17 @@ function BusinessSidebar(props: {
           <button
             key={label}
             onClick={() => {
-              scrollToSection(target);
+              if (target === "payout-action") {
+                props.onPayout();
+              } else {
+                scrollToSection(target);
+              }
               props.onNavigate();
             }}
             className={[
-              "flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[9px] font-medium transition",
+              "flex h-11 w-full items-center gap-3 rounded-[9px] px-3.5 text-left text-[11px] font-medium transition",
               index === 0
-                ? "border-l-2 border-[#14E6A1] bg-[#0D4B3E] text-white"
+                ? "border-l-2 border-[#14E6A1] bg-[linear-gradient(90deg,#0D4B3E,#0A3E35)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.03)]"
                 : "border-l-2 border-transparent text-[#C0D0CB] hover:bg-white/[.05] hover:text-white"
             ].join(" ")}
           >
@@ -1324,11 +1326,29 @@ function BusinessSidebar(props: {
         ))}
       </nav>
 
+      <div className="my-5 h-px bg-white/[.07]" />
+
+      <a
+        href="/docs"
+        className="flex h-10 w-full items-center gap-3 rounded-lg border-l-2 border-transparent px-3 text-[11px] font-medium text-[#C0D0CB] transition hover:bg-white/[.05] hover:text-white"
+      >
+        <Code2 className="h-4 w-4 text-[#C6D7D2]" />
+        Desenvolvedores
+      </a>
+
+      <a
+        href="/support"
+        className="mt-0.5 flex h-10 w-full items-center gap-3 rounded-lg border-l-2 border-transparent px-3 text-[11px] font-medium text-[#C0D0CB] transition hover:bg-white/[.05] hover:text-white"
+      >
+        <CircleHelp className="h-4 w-4 text-[#C6D7D2]" />
+        Suporte
+      </a>
+
       <div className="mt-7 rounded-xl border border-[#145546] bg-[linear-gradient(145deg,#06251F,#07342C)] p-4">
         <strong className="block max-w-[140px] text-[12px] leading-5">
           O PIX que impulsiona o seu negócio.
         </strong>
-        <p className="mt-4 text-[8px] leading-4 text-[#8EB2A8]">
+        <p className="mt-4 text-[10px] leading-4 text-[#8EB2A8]">
           Mais vendas.
           <br />
           Mais liberdade.
@@ -1338,7 +1358,7 @@ function BusinessSidebar(props: {
         <div className="mt-5 h-1 w-10 rounded-full bg-[#14E6A1]" />
       </div>
 
-      <div className="mt-5 px-2 text-[7px] leading-4 text-[#69877F]">
+      <div className="mt-5 px-2 text-[9px] leading-4 text-[#69877F]">
         <strong className="text-[#A7BDB7]">PiXBrasil</strong>
         <span className="ml-2">v0.6.2</span>
         <br />
@@ -1359,20 +1379,20 @@ function Panel(props: {
   return (
     <section
       id={props.id}
-      className="overflow-hidden rounded-2xl border border-[#DCE6E2] bg-white shadow-[0_8px_24px_rgba(28,63,54,.035)]"
+      className="overflow-hidden rounded-[14px] border border-[#DEE7E3] bg-white shadow-[0_10px_30px_rgba(28,63,54,.045)]"
     >
-      <div className="flex min-h-12 items-center justify-between border-b border-[#E7EEEB] px-4 py-3">
+      <div className="flex min-h-[54px] items-center justify-between border-b border-[#E8EEEC] px-5 py-3.5">
         <div className="flex items-center gap-2">
           <Icon className="h-4 w-4 text-[#184E42]" />
-          <strong className="text-[10px] text-[#13231F]">{props.title}</strong>
+          <strong className="text-[12px] text-[#13231F]">{props.title}</strong>
         </div>
         {props.action ? (
-          <span className="text-[7px] font-semibold text-[#1765D1]">
+          <span className="text-[9px] font-semibold text-[#1765D1]">
             {props.action}
           </span>
         ) : null}
       </div>
-      <div className="p-3 sm:p-4">{props.children}</div>
+      <div className="p-4 sm:p-5">{props.children}</div>
     </section>
   );
 }
@@ -1381,7 +1401,7 @@ function Status({ value }: { value: string }) {
   return (
     <span
       className={
-        "inline-flex rounded-full border px-2 py-1 text-[7px] font-bold " +
+        "inline-flex rounded-full border px-2 py-1 text-[9px] font-bold " +
         statusTone(value)
       }
     >
@@ -1392,7 +1412,7 @@ function Status({ value }: { value: string }) {
 
 function Empty({ label }: { label: string }) {
   return (
-    <div className="rounded-xl border border-dashed border-[#DCE6E2] px-4 py-8 text-center text-[9px] text-[#81928C]">
+    <div className="rounded-xl border border-dashed border-[#DCE6E2] px-4 py-8 text-center text-[11px] text-[#81928C]">
       {label}
     </div>
   );
@@ -1464,16 +1484,16 @@ function PayoutModal(props: {
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-[#03110F]/70 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-[500px] rounded-2xl border border-[#DCE6E2] bg-white p-5 shadow-2xl">
+      <div className="w-full max-w-[500px] rounded-[14px] border border-[#DEE7E3] bg-white p-5 shadow-2xl">
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-[8px] font-bold uppercase tracking-[.13em] text-[#13956B]">
+            <span className="text-[10px] font-bold uppercase tracking-[.13em] text-[#13956B]">
               Wallet BRL
             </span>
             <h2 className="mt-1 text-xl font-bold tracking-[-.035em]">
               Solicitar payout
             </h2>
-            <p className="mt-1 text-[9px] text-[#748780]">
+            <p className="mt-1 text-[11px] text-[#748780]">
               Disponível: {brl(props.available)}
             </p>
           </div>
@@ -1496,7 +1516,7 @@ function PayoutModal(props: {
               value={amount}
               onChange={(event) => setAmount(event.target.value)}
               required
-              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[11px] outline-none focus:border-[#20D99A]"
+              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[13px] outline-none focus:border-[#20D99A]"
               placeholder="0,00"
             />
           </Field>
@@ -1506,7 +1526,7 @@ function PayoutModal(props: {
               value={pixKey}
               onChange={(event) => setPixKey(event.target.value)}
               required
-              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[11px] outline-none focus:border-[#20D99A]"
+              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[13px] outline-none focus:border-[#20D99A]"
               placeholder="CPF, CNPJ, email, telefone ou aleatória"
             />
           </Field>
@@ -1515,7 +1535,7 @@ function PayoutModal(props: {
             <input
               value={beneficiaryName}
               onChange={(event) => setBeneficiaryName(event.target.value)}
-              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[11px] outline-none focus:border-[#20D99A]"
+              className="h-11 w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 text-[13px] outline-none focus:border-[#20D99A]"
               placeholder="Nome do titular"
             />
           </Field>
@@ -1524,7 +1544,7 @@ function PayoutModal(props: {
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
-              className="min-h-[76px] w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 py-3 text-[11px] outline-none focus:border-[#20D99A]"
+              className="min-h-[76px] w-full rounded-xl border border-[#DCE6E2] bg-[#F9FBFA] px-3 py-3 text-[13px] outline-none focus:border-[#20D99A]"
               placeholder="Informação opcional"
             />
           </Field>
@@ -1536,12 +1556,12 @@ function PayoutModal(props: {
           </div>
 
           {error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-[9px] text-red-700">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-[11px] text-red-700">
               {error}
             </div>
           ) : null}
 
-          <div className="rounded-xl border border-[#D9EEE6] bg-[#EFFAF6] p-3 text-[8px] leading-5 text-[#38675A]">
+          <div className="rounded-xl border border-[#D9EEE6] bg-[#EFFAF6] p-3 text-[10px] leading-5 text-[#38675A]">
             O pedido será colocado em validação operacional. Acompanhe o estado em Payouts.
           </div>
 
@@ -1549,7 +1569,7 @@ function PayoutModal(props: {
             <button
               type="button"
               onClick={props.onClose}
-              className="h-10 rounded-lg border border-[#DCE6E2] px-4 text-[9px] font-semibold"
+              className="h-10 rounded-lg border border-[#DCE6E2] px-4 text-[11px] font-semibold"
             >
               Cancelar
             </button>
@@ -1560,7 +1580,7 @@ function PayoutModal(props: {
                 parsedAmount <= 0 ||
                 parsedAmount > props.available
               }
-              className="flex h-10 items-center gap-2 rounded-lg bg-[#073A30] px-4 text-[9px] font-bold text-white disabled:opacity-50"
+              className="flex h-10 items-center gap-2 rounded-lg bg-[#073A30] px-4 text-[11px] font-bold text-white disabled:opacity-50"
             >
               {busy ? (
                 <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -1579,8 +1599,8 @@ function PayoutModal(props: {
 function PayoutSummary(props: { label: string; value: string }) {
   return (
     <div>
-      <span className="text-[7px] text-[#748780]">{props.label}</span>
-      <strong className="mt-1 block text-[9px]">{props.value}</strong>
+      <span className="text-[9px] text-[#748780]">{props.label}</span>
+      <strong className="mt-1 block text-[11px]">{props.value}</strong>
     </div>
   );
 }
@@ -1588,7 +1608,7 @@ function PayoutSummary(props: { label: string; value: string }) {
 function Field(props: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-[8px] font-bold uppercase tracking-[.08em] text-[#667A73]">
+      <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-[.08em] text-[#667A73]">
         {props.label}
       </span>
       {props.children}
