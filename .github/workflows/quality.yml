@@ -41,5 +41,6 @@ jobs:
           name: pixbrasil-ui-captures
           path: |
             test-results/business-dashboard-1536.png
+            test-results/business-integrations-1536.png
             test-results/terminal-mobile-390.png
           if-no-files-found: ignore
