@@ -115,7 +115,7 @@ export function HeroSection() {
             className="anim-hero-item mt-5 max-w-[520px] text-[15px] leading-[1.55] text-mist sm:text-[15.5px]"
             style={{ animationDelay: "0.4s" }}
           >
-            Uma camada brasileira para receber via PIX, aplicar routing,
+            Uma camada brasileira para receber via PIX, organizar operações por Store,
             controlar saldos, liberações e payouts com rastreabilidade de
             ponta a ponta para operações Personal e Business.
           </p>
