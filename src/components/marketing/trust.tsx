@@ -3,7 +3,7 @@ import { ClipboardCheck, Clock3, Share2, ShieldCheck } from "lucide-react";
 const FEATURES = [
   { icon: ShieldCheck, title: "Infraestrutura segura", description: "Controles técnicos, segregação de funções e trilha auditável." },
   { icon: Clock3, title: "Liquidação operacional", description: "Estados de processamento claros, sem esconder etapas intermediárias." },
-  { icon: Share2, title: "Arquitetura multi-rail", description: "Ativos, redes e providers habilitados somente por política e disponibilidade real." },
+  { icon: Share2, title: "Arquitetura multi-rail", description: "Ativos e capacidades financeiras habilitados somente por política e disponibilidade real." },
   { icon: ClipboardCheck, title: "Gestão de risco", description: "Monitoramento, revisão operacional e decisões registradas." },
 ];
 
