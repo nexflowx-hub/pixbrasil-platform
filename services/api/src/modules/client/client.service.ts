@@ -156,7 +156,6 @@ export class ClientService {
       asset_code: string;
       symbol: string;
       fee_amount: string | null;
-      provider_reference: string | null;
       created_at: string;
       completed_at: string | null;
     }>(
@@ -169,7 +168,6 @@ export class ClientService {
         ass.code as asset_code,
         ass.symbol,
         t.fee_amount::text,
-        t.provider_reference,
         t.created_at::text,
         t.completed_at::text
       from public.transactions t
@@ -201,7 +199,7 @@ export class ClientService {
 
       const merchant = merchantResult.rows[0];
       if (merchant) {
-        const [stores, payments, payouts, settlements, providerHealth, cashflow] =
+        const [stores, payments, payouts, settlements, operations, cashflow] =
           await Promise.all([
             this.database.query(
               `
@@ -211,14 +209,8 @@ export class ClientService {
                 s.name,
                 s.status,
                 s.currency,
-                gc.alias as gateway_alias,
-                p.code as provider_code,
-                coalesce(gc.metadata->>'lastConnectionHealth','UNKNOWN') as provider_health,
-                nullif(gc.metadata->>'lastConnectionLatencyMs','')::int as latency_ms,
                 rel.code as release_profile,
                 rel.release_class,
-                rcp.code as route_cost_profile,
-                rp.activation_mode as routing_mode,
                 coalesce(agg.available_brl,0)::text as available_brl,
                 coalesce(agg.pending_brl,0)::text as pending_brl,
                 coalesce(agg.total_net_brl,0)::text as total_net_brl,
@@ -226,23 +218,6 @@ export class ClientService {
               from pixbrasil.stores s
               left join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
               left join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
-              left join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
-              left join lateral (
-                select *
-                from pixbrasil.routing_policies rp0
-                where rp0.store_id=s.id and rp0.status='ACTIVE'
-                order by rp0.priority asc,rp0.version desc
-                limit 1
-              ) rp on true
-              left join lateral (
-                select gc0.*
-                from pixbrasil.routing_routes rr0
-                join pixbrasil.gateway_connections gc0 on gc0.id=rr0.gateway_connection_id
-                where rr0.policy_id=rp.id and rr0.enabled=true
-                order by rr0.priority asc
-                limit 1
-              ) gc on true
-              left join public.providers p on p.id=gc.provider_id
               left join lateral (
                 select
                   sum(case when st.status='AVAILABLE' then st.net_brl else 0 end) as available_brl,
@@ -268,23 +243,11 @@ export class ClientService {
                 pi.status,
                 pi.payment_method,
                 s.code as store_code,
-                p.code as provider_code,
-                pa.provider_payment_id,
                 pi.created_at::text,
                 pi.updated_at::text,
                 pi.completed_at::text
               from pixbrasil.payment_intents pi
               left join pixbrasil.stores s on s.id=pi.store_id
-              left join lateral (
-                select *
-                from pixbrasil.provider_attempts pa0
-                where pa0.payment_intent_id=pi.id
-                order by pa0.attempt_no desc
-                limit 1
-              ) pa on true
-              left join pixbrasil.gateway_connections gc
-                on gc.id=coalesce(pa.gateway_connection_id,pi.selected_connection_id)
-              left join public.providers p on p.id=gc.provider_id
               where pi.merchant_id=$1::uuid
               order by pi.created_at desc
               limit 50
@@ -337,40 +300,55 @@ export class ClientService {
             ),
             this.database.query(
               `
-              select distinct on (p.code)
-                p.code as provider_code,
-                gc.alias as gateway_alias,
-                coalesce(gc.metadata->>'lastConnectionHealth','UNKNOWN') as health,
-                nullif(gc.metadata->>'lastConnectionLatencyMs','')::int as latency_ms,
-                gc.metadata->>'lastConnectionTestedAt' as tested_at,
-                coalesce(stats.attempts_30d,0)::int as attempts_30d,
-                coalesce(stats.successes_30d,0)::int as successes_30d,
-                case
-                  when coalesce(stats.attempts_30d,0) = 0 then null
-                  else round(
-                    (stats.successes_30d::numeric / stats.attempts_30d::numeric) * 100,
-                    2
-                  )
-                end::text as success_rate_30d
-              from pixbrasil.stores s
-              join pixbrasil.routing_policies rp
-                on rp.store_id=s.id and rp.status='ACTIVE'
-              join pixbrasil.routing_routes rr
-                on rr.policy_id=rp.id and rr.enabled=true
-              join pixbrasil.gateway_connections gc
-                on gc.id=rr.gateway_connection_id
-              join public.providers p on p.id=gc.provider_id
-              left join lateral (
+              with payment_stats as (
                 select
-                  count(*)::int as attempts_30d,
-                  count(*) filter (where pi.status='SUCCEEDED')::int as successes_30d
-                from pixbrasil.provider_attempts pa
-                join pixbrasil.payment_intents pi on pi.id=pa.payment_intent_id
-                where pa.gateway_connection_id=gc.id
-                  and pa.started_at >= now() - interval '30 days'
-              ) stats on true
-              where s.merchant_id=$1::uuid
-              order by p.code,rp.priority asc
+                  count(*) filter (
+                    where created_at >= now() - interval '30 days'
+                  )::int as payments_30d,
+                  count(*) filter (
+                    where created_at >= now() - interval '30 days'
+                      and status='SUCCEEDED'
+                  )::int as successful_30d
+                from pixbrasil.payment_intents
+                where merchant_id=$1::uuid
+              ),
+              route_stats as (
+                select
+                  count(*)::int as routes_total,
+                  count(*) filter (
+                    where upper(coalesce(gc.metadata->>'lastConnectionHealth','UNKNOWN'))
+                      in ('HEALTHY','ACTIVE','ONLINE')
+                  )::int as routes_healthy
+                from pixbrasil.stores s
+                join pixbrasil.routing_policies rp
+                  on rp.store_id=s.id
+                 and rp.status='ACTIVE'
+                 and rp.activation_mode='ENFORCED'
+                join pixbrasil.routing_routes rr
+                  on rr.policy_id=rp.id
+                 and rr.enabled=true
+                join pixbrasil.gateway_connections gc
+                  on gc.id=rr.gateway_connection_id
+                where s.merchant_id=$1::uuid
+              )
+              select
+                ps.payments_30d,
+                ps.successful_30d,
+                case
+                  when ps.payments_30d = 0 then null
+                  else round(
+                    (ps.successful_30d::numeric / ps.payments_30d::numeric) * 100,
+                    2
+                  )::text
+                end as success_rate_30d,
+                case
+                  when rs.routes_total = 0 then 'UNKNOWN'
+                  when rs.routes_healthy = rs.routes_total then 'OPERATIONAL'
+                  when rs.routes_healthy > 0 then 'DEGRADED'
+                  else 'UNAVAILABLE'
+                end as pix_status
+              from payment_stats ps
+              cross join route_stats rs
               `,
               [merchant.merchant_id],
             ),
@@ -434,7 +412,12 @@ export class ClientService {
           payments: payments.rows,
           payouts: payouts.rows,
           settlements: settlements.rows,
-          providerHealth: providerHealth.rows,
+          operations: {
+            pixStatus: operations.rows[0]?.pix_status ?? "UNKNOWN",
+            payments30d: Number(operations.rows[0]?.payments_30d ?? 0),
+            successful30d: Number(operations.rows[0]?.successful_30d ?? 0),
+            successRate30d: operations.rows[0]?.success_rate_30d ?? null,
+          },
           cashflow: cashflow.rows,
         };
       }
@@ -453,12 +436,7 @@ export class ClientService {
           depositsEnabled: account.type === "BUSINESS",
           withdrawalsEnabled: account.type === "BUSINESS",
           exchangeEnabled: false,
-          payoutMode: account.type === "BUSINESS" ? "MANUAL_TICKET" : "DISABLED",
-          payoutChannel: account.type === "BUSINESS" ? "TELEGRAM" : null,
-          note:
-            account.type === "BUSINESS"
-              ? "PIX production is active. Payouts are processed manually by ticket during the current rollout."
-              : "Personal account operations depend on the enabled asset and account policy.",
+          payoutsEnabled: account.type === "BUSINESS",
         },
       },
     };
