@@ -69,6 +69,7 @@ const NAV_ITEMS = [
   ["Wallet BRL", WalletCards, "wallet"],
   ["Stores", Store, "stores"],
   ["Pagamentos PIX", CreditCard, "payments"],
+  ["Terminal PIX", Smartphone, "terminal-app"],
   ["Transações", Activity, "movements"],
   ["Liberações", CalendarDays, "releases"],
   ["Payouts", Send, "payout-action"],
@@ -1385,6 +1386,20 @@ function BusinessSidebar(props: {
           const iconClass = active
             ? "h-4 w-4 text-[#20E7A6]"
             : "h-4 w-4 text-[#C6D7D2]";
+
+          if (target === "terminal-app") {
+            return (
+              <a
+                key={label}
+                href="/terminal"
+                onClick={props.onNavigate}
+                className={className}
+              >
+                <Icon className={iconClass} />
+                {label}
+              </a>
+            );
+          }
 
           if (target === "integrations") {
             return (
