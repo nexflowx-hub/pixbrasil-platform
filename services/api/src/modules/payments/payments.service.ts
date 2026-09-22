@@ -294,6 +294,7 @@ export class PaymentsService {
     merchant: MerchantApiContext,
     idempotencyKeyValue: string | undefined,
     input: ChargeInput,
+    options: { trustedAccountSession?: boolean } = {},
   ) {
     const idempotencyKey = requiredString(
       idempotencyKeyValue,
@@ -324,8 +325,54 @@ export class PaymentsService {
 
     const merchantMetadata = normalizeMetadata(input.metadata);
 
-    const configResult = await this.database.query<StoreConfigRow>(
-      `
+    const configResult = options.trustedAccountSession
+      ? await this.database.query<StoreConfigRow>(
+          `
+      select
+        s.id as store_id,
+        s.code as store_code,
+        s.name as store_name,
+        m.id as merchant_id,
+        m.account_id,
+        m.tier_code as merchant_tier,
+        sfp.route_cost_profile_id,
+        rcp.code as route_cost_profile_code,
+        sfp.release_profile_id,
+        rel.code as release_profile_code,
+        rel.release_class,
+        sfp.fee_profile_id,
+        fp.code as fee_profile_code,
+        rp.id as policy_id,
+        rp.name as policy_name,
+        rp.version as policy_version,
+        rp.strategy,
+        rp.activation_mode
+      from pixbrasil.stores s
+      join pixbrasil.merchants m on m.id=s.merchant_id
+      
+      join pixbrasil.store_financial_profiles sfp on sfp.store_id=s.id
+      join pixbrasil.route_cost_profiles rcp on rcp.id=sfp.route_cost_profile_id
+      join pixbrasil.release_profiles rel on rel.id=sfp.release_profile_id
+      left join pixbrasil.fee_profiles fp on fp.id=sfp.fee_profile_id
+      join lateral (
+        select rp0.*
+        from pixbrasil.routing_policies rp0
+        where rp0.store_id=s.id
+          and rp0.payment_method='PIX'
+          and rp0.currency='BRL'
+          and rp0.status='ACTIVE'
+        order by rp0.priority asc, rp0.version desc
+        limit 1
+      ) rp on true
+      where s.merchant_id=$1::uuid
+        and upper(s.code)=upper($2::text)
+        and s.status='ACTIVE'
+      limit 1
+          `,
+          [merchant.merchantId, storeCode],
+        )
+      : await this.database.query<StoreConfigRow>(
+          `
       select
         s.id as store_id,
         s.code as store_code,
@@ -368,17 +415,19 @@ export class PaymentsService {
         and upper(s.code)=upper($3::text)
         and s.status='ACTIVE'
       limit 1
-      `,
-      [merchant.apiKeyId, merchant.merchantId, storeCode],
-    );
+          `,
+          [merchant.apiKeyId, merchant.merchantId, storeCode],
+        );
 
     const config = configResult.rows[0];
     if (!config) {
-      if (!merchant.allowedStoreIds.length) {
+      if (!options.trustedAccountSession && !merchant.allowedStoreIds.length) {
         throw new ForbiddenException("API key has no store grants.");
       }
       throw new NotFoundException(
-        "Store not found, inactive, or not granted to this API key.",
+        options.trustedAccountSession
+          ? "Store not found or inactive for this business account."
+          : "Store not found, inactive, or not granted to this API key.",
       );
     }
 
