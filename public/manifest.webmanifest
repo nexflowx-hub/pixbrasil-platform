@@ -1,7 +1,7 @@
 {
   "name": "PiXBrasil.org — Seu dinheiro sem fronteiras",
   "short_name": "PiXBrasil",
-  "description": "Experiência brasileira para PIX e ativos digitais, atualmente em fase de pré-lançamento.",
+  "description": "PiXBrasil para pagamentos PIX, Wallet BRL, cobranças e operações Business.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",
