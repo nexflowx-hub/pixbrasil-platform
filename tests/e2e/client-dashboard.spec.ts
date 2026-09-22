@@ -238,6 +238,6 @@ test("Business dashboard mobile não cria overflow e mantém navegação acessí
   expect(overflow).toBeLessThanOrEqual(2);
 
   await menu.click();
-  await expect(page.getByRole("button", { name: "Fechar menu" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Fechar menu" }).last()).toBeVisible();
   await expect(page.getByText("PiXBrasil Business", { exact: true }).first()).toBeVisible();
 });
