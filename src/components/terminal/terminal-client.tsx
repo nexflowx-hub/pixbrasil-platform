@@ -469,6 +469,11 @@ export function TerminalClient() {
       );
       const body = (await response.json().catch(() => ({}))) as ChargePayload;
       if (!response.ok || !body.data) {
+        if (response.status === 404) {
+          throw new Error(
+            "Terminal temporariamente indisponível. Tente novamente em instantes.",
+          );
+        }
         throw new Error(body.message || "Não foi possível gerar a cobrança.");
       }
       setPayment(body.data);
