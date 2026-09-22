@@ -1360,7 +1360,7 @@ function BusinessSidebar(props: {
         className="flex h-10 w-full items-center gap-3 rounded-lg border-l-2 border-transparent px-3 text-[12px] font-medium text-[#C0D0CB] transition hover:bg-white/[.05] hover:text-white"
       >
         <Code2 className="h-4 w-4 text-[#C6D7D2]" />
-        Desenvolvedores
+        Documentação API
       </a>
 
       <a
