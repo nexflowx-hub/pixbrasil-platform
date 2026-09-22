@@ -16,10 +16,10 @@ export default function AccessPage() {
         "Contas Personal e Business",
         "Wallet BRL e visão financeira por Store",
         "API PIX S2S com webhooks assinados",
-        "Routing multi-provider e classes de liberação",
+        "Orquestração PIX e classes de liberação",
         "Payouts por ticket manual durante a fase atual de automação",
       ]}
-      note="Nunca envie API Keys, credenciais de provider ou chaves secretas por chat ou canais não autorizados. Credenciais devem permanecer no ambiente server-side ou Vault."
+      note="Nunca envie API Keys, credenciais de infraestrutura financeira ou chaves secretas por chat ou canais não autorizados. Credenciais devem permanecer no ambiente server-side ou Vault."
     />
   );
 }
