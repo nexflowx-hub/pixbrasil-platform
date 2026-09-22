@@ -11,7 +11,7 @@ const BENEFITS_PERSONAL = [
 
 const BENEFITS_BUSINESS = [
   "API PIX S2S em piloto",
-  "Stores e routing por operação",
+  "Stores e regras por operação",
   "Liquidação em ativos digitais",
   "Suporte especializado",
 ];
@@ -120,7 +120,7 @@ export function Audiences() {
         id="empresas"
         title="Para Empresas"
         subtitle="Soluções completas para o seu negócio."
-        description="Integre API PIX, separe Stores por regra comercial e acompanhe routing, provider e liberação em uma única camada operacional."
+        description="Integre API PIX, separe Stores por regra comercial e acompanhe pagamentos, liberações e Wallet BRL em uma única camada operacional."
         benefits={BENEFITS_BUSINESS}
         href="/business"
         image="/images/sao-paulo-night.png"
