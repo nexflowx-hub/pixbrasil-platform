@@ -125,7 +125,7 @@ export function DeveloperCenter(props: {
   }, [activeStores, canManage, props.accountId, selectedStores.length]);
 
   useEffect(() => {
-    void load();
+    void Promise.resolve().then(() => load());
   }, [load]);
 
   function toggleStore(code: string) {
