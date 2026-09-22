@@ -833,7 +833,7 @@ function PixOperationsPanel(props: {
               PiXBrasil Processing
             </span>
             <strong className="mt-1 block text-[14px] tracking-[-.025em] text-[#10231E]">
-              Fluxo financeiro protegido
+              Processamento e liquidação
             </strong>
           </div>
           <span
