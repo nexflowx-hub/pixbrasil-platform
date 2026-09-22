@@ -10,5 +10,6 @@ import { PaymentsService } from "./payments.service";
   imports: [MerchantAuthModule, RoutingModule, ProvidersModule],
   controllers: [PaymentsController],
   providers: [PaymentsService, PaymentLiveExecutionService],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}
