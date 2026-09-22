@@ -95,7 +95,7 @@ export function ClientPortal() {
 
   useEffect(() => {
     if (!accountId) return;
-    void loadOverview(accountId);
+    void Promise.resolve().then(() => loadOverview(accountId));
   }, [accountId, loadOverview]);
 
   const activeAccess = useMemo(
