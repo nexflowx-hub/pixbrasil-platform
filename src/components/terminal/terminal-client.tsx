@@ -200,6 +200,35 @@ export function TerminalClient() {
   }, [storeCode]);
 
   useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (payment || creating) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+      ) {
+        return;
+      }
+
+      if (/^\d$/.test(event.key)) {
+        setAmountCents((current) => {
+          const base = current === "0" ? "" : current;
+          const next = (base + event.key).replace(/^0+/, "").slice(0, 10);
+          return next || "0";
+        });
+      } else if (event.key === "Backspace") {
+        event.preventDefault();
+        setAmountCents((current) => current.slice(0, -1) || "0");
+      } else if (event.key === "Escape") {
+        setAmountCents("0");
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [creating, payment]);
+
+  useEffect(() => {
     localStorage.setItem("pixbrasil:terminal:name", terminalName);
   }, [terminalName]);
 
