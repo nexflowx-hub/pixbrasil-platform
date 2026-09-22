@@ -305,3 +305,66 @@ test("Terminal móvel abre como POS e mantém infraestrutura interna invisível"
     fullPage: true,
   });
 });
+
+
+test("Terminal gera QR local a partir do PIX Copia e Cola", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockBusiness(page);
+
+  const pendingPayment = {
+    success: true,
+    data: {
+      paymentIntentId: "70000000-0000-0000-0000-000000000001",
+      reference: "POS-SIGNUM-001",
+      amount: 1,
+      currency: "BRL",
+      status: "PENDING_PAYMENT",
+      storeCode: "SIGNUM",
+      action: {
+        type: "PIX",
+        copyPaste:
+          "00020101021226890014br.gov.bcb.pix2567pixbrasil.org/cob/700000000000000000000000000000015204000053039865802BR5910PIXBRASIL6008BRASILIA62070503***6304ABCD",
+        expiresAt: "2026-09-22T22:00:00-03:00",
+      },
+      createdAt: "2026-09-22T18:00:00-03:00",
+      updatedAt: "2026-09-22T18:00:00-03:00",
+      completedAt: null,
+    },
+  };
+
+  await page.route("**/api/client/accounts/*/terminal/charge", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(pendingPayment),
+    });
+  });
+  await page.route(
+    "**/api/client/accounts/*/terminal/payments/*",
+    async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(pendingPayment),
+      });
+    },
+  );
+
+  await page.goto("/terminal");
+  await expect(page.getByRole("combobox")).toHaveValue("SIGNUM");
+
+  await page.getByRole("button", { name: "1", exact: true }).click();
+  await page.getByPlaceholder("Somente números").fill("52998224725");
+  await page.getByRole("button", { name: "Cobrar agora" }).click();
+
+  const qr = page.getByRole("img", { name: "QR Code PIX da cobrança" });
+  await expect(qr).toBeVisible();
+  await expect(qr).toHaveAttribute("src", /^data:image\//);
+  await expect(page.getByRole("button", { name: "Copiar PIX" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Partilhar" })).toBeEnabled();
+
+  await page.screenshot({
+    path: "test-results/terminal-charge-390.png",
+    fullPage: true,
+  });
+});
