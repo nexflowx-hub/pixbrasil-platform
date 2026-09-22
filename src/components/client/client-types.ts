@@ -73,7 +73,6 @@ export type SettlementRow = {
   external_reference: string | null;
   store_code: string | null;
   gross_brl: string;
-  provider_fee_brl: string;
   platform_fee_brl: string;
   net_brl: string;
   status: string;
