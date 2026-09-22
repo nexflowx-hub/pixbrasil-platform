@@ -462,7 +462,7 @@ function NotificationPanel(props: {
               Payout
             </span>
             <strong className="mt-1 block text-[11px]">
-              {brl(row.amount)} · {row.status}
+              {brl(row.amount)} · {statusLabel(row.status)}
             </strong>
           </div>
         ))}
@@ -955,7 +955,7 @@ function PerformancePanel(props: {
       id="payments"
       title="Performance PIX"
       icon={BarChart3}
-      action="Dados reais disponíveis"
+      action="Últimos 30 dias"
     >
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {metrics.map(([label, value], index) => (
@@ -982,7 +982,7 @@ function QuickActions(props: {
   financialWritesEnabled: boolean;
 }) {
   return (
-    <Panel title="Ações rápidas" icon={KeyRound} action="Operação Business">
+    <Panel title="Ações rápidas" icon={KeyRound} action="Acesso rápido">
       <div className="grid gap-2 sm:grid-cols-2">
         <a
           href="/docs/api"
@@ -1250,7 +1250,7 @@ function BusinessSidebar(props: {
   return (
     <aside
       className={[
-        "min-h-screen bg-[linear-gradient(180deg,#031713_0%,#041D18_100%)] px-3.5 py-6 text-white",
+        "min-h-screen bg-[linear-gradient(180deg,#031713_0%,#041D18_100%)] px-3.5 py-6 text-white lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto",
         props.mobile ? "block h-full overflow-y-auto" : "hidden lg:block"
       ].join(" ")}
     >
@@ -1271,7 +1271,7 @@ function BusinessSidebar(props: {
               {props.activeAccess.merchant?.trade_name || "Business"}
             </strong>
             <span className="mt-1 block text-[9px] text-[#71958B]">
-              {props.activeAccess.role} · {compactId(props.accountId)}
+              PiXBrasil Business
             </span>
           </div>
           {(props.session?.accounts.length ?? 0) > 1 ? (
@@ -1360,8 +1360,7 @@ function BusinessSidebar(props: {
       </div>
 
       <div className="mt-5 px-2 text-[9px] leading-4 text-[#69877F]">
-        <strong className="text-[#A7BDB7]">PiXBrasil</strong>
-        <span className="ml-2">v0.6.2</span>
+        <strong className="text-[#A7BDB7]">PiXBrasil Business</strong>
         <br />
         © 2026 Todos os direitos reservados.
       </div>
@@ -1388,7 +1387,7 @@ function Panel(props: {
           <strong className="text-[12px] text-[#13231F]">{props.title}</strong>
         </div>
         {props.action ? (
-          <span className="text-[9px] font-semibold text-[#1765D1]">
+          <span className="rounded-full bg-[#F3F7F5] px-2.5 py-1 text-[9px] font-semibold text-[#6B7E77]">
             {props.action}
           </span>
         ) : null}
