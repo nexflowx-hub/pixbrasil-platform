@@ -29,6 +29,8 @@ jobs:
         run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm run lint
+      - name: Client/provider boundary
+        run: node scripts/check-client-provider-boundary.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
