@@ -18,7 +18,7 @@ export default function DocsHomePage() {
     <DocsShell
       eyebrow="MERCHANT DOCUMENTATION"
       title="Integre PIX sem transformar o seu site num projeto financeiro."
-      description="O PiXBrasil separa Store, routing, provider, liberação e credenciais. Esta documentação mostra o fluxo mínimo e seguro para integrar um site, e-commerce, SaaS ou funnel ao Core."
+      description="O PiXBrasil separa Stores, pagamentos, liberações, Wallet BRL e credenciais. Esta documentação mostra o fluxo mínimo e seguro para integrar um site, e-commerce, SaaS ou funnel."
     >
       <DocsSection id="status" title="Estado atual da plataforma" description="A documentação reflete a operação de produção: cobrança PIX, status, webhooks, settlement e Wallet BRL.">
         <DocsGrid>
@@ -30,13 +30,13 @@ export default function DocsHomePage() {
             <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Disponível</div>
             <p className="mt-2">Endpoints HTTPS assinados com HMAC-SHA256 e signing secret em Vault.</p>
           </DocsCard>
-          <DocsCard title="Provider execution" tone="green">
+          <DocsCard title="Execução PIX" tone="green">
             <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Produção</div>
-            <p className="mt-2">Stores ativas criam PIX real no provider definido pelo routing e retornam QR/Copia e Cola.</p>
+            <p className="mt-2">Stores ativas criam PIX real e retornam QR Code e Copia e Cola por uma interface única do PiXBrasil.</p>
           </DocsCard>
           <DocsCard title="Settlement & payouts" tone="green">
             <div className="flex items-center gap-2 text-[#79D8B8]"><CheckCircle2 className="h-3.5 w-3.5" /> Operacional</div>
-            <p className="mt-2">Settlement alimenta a Wallet BRL conforme a release policy. Payouts são processados por ticket manual nesta fase.</p>
+            <p className="mt-2">As liberações alimentam a Wallet BRL conforme a regra comercial da Store. Payouts podem ser solicitados diretamente pelo portal.</p>
           </DocsCard>
         </DocsGrid>
       </DocsSection>
@@ -45,7 +45,7 @@ export default function DocsHomePage() {
         <div className="grid gap-3 md:grid-cols-4">
           {[
             [Store, "Merchant", "A empresa que integra o PiXBrasil."],
-            [Store, "Store", "O escopo comercial/operacional que define routing e release."],
+            [Store, "Store", "O escopo comercial que organiza pagamentos, regras e liberações."],
             [Braces, "PaymentIntent", "A intenção de pagamento criada de forma idempotente."],
             [Webhook, "Webhook", "A confirmação assíncrona enviada ao backend do merchant."],
           ].map(([Icon, title, text]) => (
