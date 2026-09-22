@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { ClientPortal } from "@/components/client/client-portal";
 
 export const metadata: Metadata = {
-  title: "Client Portal",
-  description: "Contas Personal e Business no PiXBrasil.",
+  title: "PiXBrasil | Client Portal",
+  description: "Portal PiXBrasil para contas Particular e Business.",
   robots: { index: false, follow: false },
 };
 
