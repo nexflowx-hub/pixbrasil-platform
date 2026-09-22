@@ -515,6 +515,38 @@ function NotificationPanel(props: {
   );
 }
 
+function IntegrationsHeader(props: { merchantName: string }) {
+  return (
+    <section className="relative overflow-hidden rounded-[18px] border border-[#D9E7E1] bg-[linear-gradient(135deg,rgba(255,255,255,.96),rgba(239,249,245,.9))] px-5 py-6 shadow-[0_18px_50px_-36px_rgba(8,72,51,.28)] sm:px-6">
+      <div className="finance-ridge pointer-events-none absolute inset-0 opacity-50" />
+      <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <span className="text-[10px] font-bold uppercase tracking-[.16em] text-[#118765]">
+            {props.merchantName}
+          </span>
+          <h1 className="mt-2 text-[32px] font-bold tracking-[-.045em] text-[#081512] sm:text-[36px]">
+            Integrações
+          </h1>
+          <p className="mt-2 max-w-3xl text-[13px] leading-6 text-[#60746D]">
+            Controle as credenciais de produção por Store e os Webhooks que conectam o PiXBrasil ao seu sistema.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-[10px] font-semibold text-[#365C50]">
+          <span className="rounded-full border border-[#CFE4DC] bg-white/80 px-3 py-1.5">
+            API Keys por Store
+          </span>
+          <span className="rounded-full border border-[#CFE4DC] bg-white/80 px-3 py-1.5">
+            HMAC-SHA256
+          </span>
+          <span className="rounded-full border border-[#CFE4DC] bg-white/80 px-3 py-1.5">
+            Produção
+          </span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function DashboardHeader(props: {
   today: string;
   busy: boolean;
@@ -1287,12 +1319,13 @@ function BusinessSidebar(props: {
   activeAccess: AccountAccess;
   onNavigate: () => void;
   onPayout: () => void;
+  view: "overview" | "integrations";
   mobile: boolean;
 }) {
   return (
     <aside
       className={[
-        "min-h-screen bg-[linear-gradient(180deg,#031713_0%,#041D18_100%)] px-3.5 py-6 text-white lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto",
+        "finance-sidebar min-h-screen bg-[linear-gradient(180deg,#031713_0%,#041D18_100%)] px-3.5 py-6 text-white lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto",
         props.mobile ? "block h-full overflow-y-auto" : "hidden lg:block"
       ].join(" ")}
     >
@@ -1339,34 +1372,66 @@ function BusinessSidebar(props: {
       </div>
 
       <nav className="mt-5 space-y-0.5">
-        {NAV_ITEMS.map(([label, Icon, target], index) => (
-          <button
-            key={label}
-            onClick={() => {
-              if (target === "payout-action") {
-                props.onPayout();
-              } else {
-                scrollToSection(target);
-              }
-              props.onNavigate();
-            }}
-            className={[
-              "flex h-11 w-full items-center gap-3 rounded-[9px] px-3.5 text-left text-[12px] font-medium transition",
-              index === 0
-                ? "border-l-2 border-[#14E6A1] bg-[linear-gradient(90deg,#0D4B3E,#0A3E35)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.03)]"
-                : "border-l-2 border-transparent text-[#C0D0CB] hover:bg-white/[.05] hover:text-white"
-            ].join(" ")}
-          >
-            <Icon
-              className={
-                index === 0
-                  ? "h-4 w-4 text-[#20E7A6]"
-                  : "h-4 w-4 text-[#C6D7D2]"
-              }
-            />
-            {label}
-          </button>
-        ))}
+        {NAV_ITEMS.map(([label, Icon, target], index) => {
+          const active =
+            (props.view === "overview" && index === 0) ||
+            (props.view === "integrations" && target === "integrations");
+          const className = [
+            "finance-press flex h-11 w-full items-center gap-3 rounded-[9px] px-3.5 text-left text-[12px] font-medium transition",
+            active
+              ? "border-l-2 border-[#14E6A1] bg-[linear-gradient(90deg,#0D4B3E,#0A3E35)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,.03),0_10px_24px_-18px_rgba(32,242,154,.48)]"
+              : "border-l-2 border-transparent text-[#C0D0CB] hover:bg-white/[.05] hover:text-white"
+          ].join(" ");
+          const iconClass = active
+            ? "h-4 w-4 text-[#20E7A6]"
+            : "h-4 w-4 text-[#C6D7D2]";
+
+          if (target === "integrations") {
+            return (
+              <a
+                key={label}
+                href="/app/integrations"
+                onClick={props.onNavigate}
+                className={className}
+              >
+                <Icon className={iconClass} />
+                {label}
+              </a>
+            );
+          }
+
+          if (props.view === "integrations" && target !== "payout-action") {
+            return (
+              <a
+                key={label}
+                href={target === "overview" ? "/app" : "/app#" + target}
+                onClick={props.onNavigate}
+                className={className}
+              >
+                <Icon className={iconClass} />
+                {label}
+              </a>
+            );
+          }
+
+          return (
+            <button
+              key={label}
+              onClick={() => {
+                if (target === "payout-action") {
+                  props.onPayout();
+                } else {
+                  scrollToSection(target);
+                }
+                props.onNavigate();
+              }}
+              className={className}
+            >
+              <Icon className={iconClass} />
+              {label}
+            </button>
+          );
+        })}
       </nav>
 
       <div className="my-5 h-px bg-white/[.07]" />
