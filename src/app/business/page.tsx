@@ -3,7 +3,7 @@ import { AudienceProductPage } from "@/components/marketing/audience-product-pag
 
 export const metadata: Metadata = {
   title: "Para Empresas",
-  description: "Estado real das capacidades PiXBrasil no MVP controlado.",
+  description: "PiXBrasil Business para operações PIX, Stores, Wallet BRL, liberações e payouts.",
 };
 
 export default function Page() {
