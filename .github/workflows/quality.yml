@@ -34,3 +34,12 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Upload UI captures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: pixbrasil-ui-captures
+          path: |
+            test-results/business-dashboard-1536.png
+            test-results/terminal-mobile-390.png
+          if-no-files-found: ignore
