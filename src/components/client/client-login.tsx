@@ -1,13 +1,12 @@
 "use client";
 
 import { ArrowRight, KeyRound, LockKeyhole, ShieldCheck } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 
 export function ClientLogin() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,7 +32,8 @@ export function ClientLogin() {
         throw new Error(payload.message || "Não foi possível entrar.");
       }
 
-      const requested = searchParams.get("next") || "/app";
+      const requested =
+        new URLSearchParams(window.location.search).get("next") || "/app";
       const next =
         requested.startsWith("/") && !requested.startsWith("//")
           ? requested
