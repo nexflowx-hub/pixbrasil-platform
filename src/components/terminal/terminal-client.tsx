@@ -50,6 +50,89 @@ type ChargePayload = {
   message?: string;
 };
 
+type QRCodeInstance = {
+  addData: (data: string, mode?: "Byte") => void;
+  make: () => void;
+  createDataURL: (cellSize?: number, margin?: number) => string;
+};
+
+type QRCodeFactory = (
+  typeNumber: number,
+  errorCorrectionLevel: "L" | "M" | "Q" | "H",
+) => QRCodeInstance;
+
+declare global {
+  interface Window {
+    qrcode?: QRCodeFactory;
+  }
+}
+
+let qrFactoryPromise: Promise<QRCodeFactory> | null = null;
+
+function loadLocalQrFactory() {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("QR renderer requires the browser."));
+  }
+  if (window.qrcode) return Promise.resolve(window.qrcode);
+  if (qrFactoryPromise) return qrFactoryPromise;
+
+  qrFactoryPromise = new Promise<QRCodeFactory>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-pixbrasil-qr="true"]',
+    );
+    const onReady = () => {
+      if (window.qrcode) {
+        resolve(window.qrcode);
+      } else {
+        qrFactoryPromise = null;
+        reject(new Error("QR renderer did not initialize."));
+      }
+    };
+
+    if (existing) {
+      if (window.qrcode) {
+        resolve(window.qrcode);
+      } else {
+        existing.addEventListener("load", onReady, { once: true });
+        existing.addEventListener(
+          "error",
+          () => {
+            qrFactoryPromise = null;
+            reject(new Error("Unable to load local QR renderer."));
+          },
+          { once: true },
+        );
+      }
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "/vendor/qrcode-generator.js";
+    script.async = true;
+    script.dataset.pixbrasilQr = "true";
+    script.addEventListener("load", onReady, { once: true });
+    script.addEventListener(
+      "error",
+      () => {
+        qrFactoryPromise = null;
+        reject(new Error("Unable to load local QR renderer."));
+      },
+      { once: true },
+    );
+    document.head.appendChild(script);
+  });
+
+  return qrFactoryPromise;
+}
+
+async function createLocalQrDataUrl(payload: string) {
+  const factory = await loadLocalQrFactory();
+  const code = factory(0, "M");
+  code.addData(payload, "Byte");
+  code.make();
+  return code.createDataURL(6, 12);
+}
+
 const KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "00", "0"];
 
 function digits(value: string) {
@@ -115,6 +198,7 @@ export function TerminalClient() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState("");
   const [successFlash, setSuccessFlash] = useState(false);
+  const [qrImage, setQrImage] = useState("");
 
   const amount = Number(amountCents || 0) / 100;
 
@@ -286,6 +370,42 @@ export function TerminalClient() {
     return () => window.clearInterval(timer);
   }, [accountId, loadOverview, payment?.paymentIntentId, payment?.status]);
 
+  useEffect(() => {
+    let active = true;
+    const upstreamImage = normalizeQrImage(payment?.action?.qrCodeImage);
+    const copyPaste = String(payment?.action?.copyPaste ?? "").trim();
+
+    if (upstreamImage) {
+      void Promise.resolve().then(() => {
+        if (active) setQrImage(upstreamImage);
+      });
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!copyPaste) {
+      void Promise.resolve().then(() => {
+        if (active) setQrImage("");
+      });
+      return () => {
+        active = false;
+      };
+    }
+
+    void createLocalQrDataUrl(copyPaste)
+      .then((dataUrl) => {
+        if (active) setQrImage(dataUrl);
+      })
+      .catch(() => {
+        if (active) setQrImage("");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [payment?.action?.copyPaste, payment?.action?.qrCodeImage]);
+
   function appendKey(key: string) {
     if (payment || creating) return;
     setAmountCents((current) => {
@@ -305,6 +425,7 @@ export function TerminalClient() {
     setAmountCents("0");
     setPayerTaxId("");
     setDescription("");
+    setQrImage("");
     setError("");
   }
 
@@ -383,8 +504,6 @@ export function TerminalClient() {
     }
     await navigator.clipboard.writeText(text);
   }
-
-  const qrImage = normalizeQrImage(payment?.action?.qrCodeImage);
 
   if (busy) {
     return (
@@ -568,8 +687,8 @@ export function TerminalClient() {
                           PIX Copia e Cola pronto
                         </strong>
                         <p className="mt-2 text-[10px] leading-5 text-[#6A7C76]">
-                          Esta rota não devolveu uma imagem QR. Use Copiar ou
-                          Partilhar abaixo.
+                          A preparar o QR local. O PIX Copia e Cola continua
+                          disponível abaixo.
                         </p>
                       </div>
                     </div>
