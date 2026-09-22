@@ -338,9 +338,14 @@ function normalizeProviderAction(payload: unknown) {
 
 
 function merchantEconomics(value: Record<string, unknown>) {
+  const grossBrl = Number(value.grossBrl ?? 0);
+  const estimatedMerchantNetBrl = Number(value.estimatedMerchantNetBrl ?? 0);
   return {
-    grossBrl: Number(value.grossBrl ?? 0),
-    platformFeeBrl: Number(value.platformFeeBrl ?? 0),
-    estimatedMerchantNetBrl: Number(value.estimatedMerchantNetBrl ?? 0),
+    grossBrl,
+    processingFeeBrl: Math.max(
+      0,
+      Math.round((grossBrl - estimatedMerchantNetBrl) * 100) / 100,
+    ),
+    estimatedMerchantNetBrl,
   };
 }
