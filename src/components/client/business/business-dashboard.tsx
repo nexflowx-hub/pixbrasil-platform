@@ -1033,6 +1033,28 @@ function PerformancePanel(props: {
           </div>
         ))}
       </div>
+
+      <div className="mt-3 overflow-hidden rounded-[12px] border border-[#DBE9E4] bg-[linear-gradient(145deg,#F8FCFA,#F0F8F5)] px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[10px] font-semibold text-[#5F766E]">
+            Eficiência operacional
+          </span>
+          <strong className="text-[11px] text-[#0B7656]">
+            {props.successRate == null
+              ? "Aguardando volume"
+              : props.successful30d + " de " + props.paymentCount30d + " concluídos"}
+          </strong>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#DCEAE5]">
+          <div
+            className="h-full rounded-full bg-[linear-gradient(90deg,#17C98E,#28E3B2)] shadow-[0_0_14px_rgba(23,201,142,.3)] transition-[width] duration-700"
+            style={{
+              width:
+                Math.max(0, Math.min(100, props.successRate ?? 0)) + "%"
+            }}
+          />
+        </div>
+      </div>
     </Panel>
   );
 }
@@ -1043,7 +1065,7 @@ function QuickActions(props: {
 }) {
   return (
     <Panel title="Ações rápidas" icon={KeyRound} action="Acesso rápido">
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         <a
           href="/docs/api"
           className="flex min-h-[72px] items-center gap-3 rounded-xl border border-[#D9EEE6] bg-[#EAFAF4] p-3 transition hover:-translate-y-[1px]"
