@@ -199,7 +199,6 @@ test("Business dashboard mantém hierarquia premium e não expõe providers", as
   await expect(page.getByRole("heading", { name: "Visão geral financeira" })).toBeVisible();
   await expect(page.getByText("Wallet BRL empresarial", { exact: false })).toBeVisible();
   await expect(page.getByText("Operação PIX", { exact: true })).toBeVisible();
-  await expect(page.getByText("API Keys & Webhooks", { exact: true })).toBeVisible();
 
   const body = await page.locator("body").innerText();
   for (const forbidden of [
@@ -235,6 +234,28 @@ test("Business dashboard mantém hierarquia premium e não expõe providers", as
 
   await page.screenshot({
     path: "test-results/business-dashboard-1536.png",
+    fullPage: true,
+  });
+});
+
+test("Business Integrações separa API Keys e Webhooks da visão financeira", async ({ page }) => {
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  await mockBusiness(page);
+  await page.goto("/app/integrations");
+
+  await expect(page.getByRole("heading", { name: "Integrações" })).toBeVisible();
+  await expect(page.getByText("API Keys & Webhooks", { exact: true })).toBeVisible();
+  await expect(page.getByText("API Keys", { exact: true })).toBeVisible();
+  await expect(page.getByText("Webhooks", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Visão geral financeira" })).toHaveCount(0);
+
+  const body = (await page.locator("body").innerText()).toLowerCase();
+  for (const forbidden of ["misticpay", "pixgo", "provider", "gateway"]) {
+    expect(body).not.toContain(forbidden);
+  }
+
+  await page.screenshot({
+    path: "test-results/business-integrations-1536.png",
     fullPage: true,
   });
 });
