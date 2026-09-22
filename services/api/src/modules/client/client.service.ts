@@ -283,7 +283,7 @@ export class ClientService {
                 pi.external_reference,
                 s.code as store_code,
                 st.gross_brl::text,
-                st.platform_fee_brl::text,
+                (st.gross_brl - st.net_brl)::text as fees_brl,
                 st.net_brl::text,
                 st.status,
                 st.available_at::text,
