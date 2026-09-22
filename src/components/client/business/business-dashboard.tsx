@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
+import { DeveloperCenter } from "@/components/client/business/developer-center";
 import type {
   AccountAccess,
   CashflowRow,
@@ -69,6 +70,7 @@ const NAV_ITEMS = [
   ["Transações", Activity, "movements"],
   ["Liberações", CalendarDays, "releases"],
   ["Payouts", Send, "payout-action"],
+  ["Integrações", Code2, "integrations"],
   ["Relatórios", FileText, "cashflow"]
 ] as const;
 
@@ -253,6 +255,12 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
                   available={summary.availableBrl}
                 />
               </section>
+
+              <DeveloperCenter
+                accountId={props.accountId}
+                stores={business?.stores ?? []}
+                role={props.activeAccess.role}
+              />
             </div>
           </div>
         </div>
@@ -1036,9 +1044,10 @@ function QuickActions(props: {
           </div>
         </button>
 
-        <a
-          href="/docs/webhooks"
-          className="flex min-h-[72px] items-center gap-3 rounded-xl border border-[#E1E9E6] bg-white p-3 transition hover:-translate-y-[1px] hover:bg-[#FBFCFC]"
+        <button
+          type="button"
+          onClick={() => scrollToSection("integrations")}
+          className="flex min-h-[72px] items-center gap-3 rounded-xl border border-[#E1E9E6] bg-white p-3 text-left transition hover:-translate-y-[1px] hover:bg-[#FBFCFC]"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F1F6F4] text-[#5B55C8]">
             <Code2 className="h-4 w-4" />
@@ -1046,10 +1055,10 @@ function QuickActions(props: {
           <div>
             <strong className="block text-[12px]">API & Webhooks</strong>
             <span className="mt-1 block text-[11px] text-[#70837C]">
-              Integração técnica
+              Chaves por Store e notificações
             </span>
           </div>
-        </a>
+        </button>
       </div>
     </Panel>
   );
