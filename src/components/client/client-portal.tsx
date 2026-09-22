@@ -11,7 +11,7 @@ import type {
   SessionPayload
 } from "@/components/client/client-types";
 
-export function ClientPortal() {
+export function ClientPortal({ view = "overview" }: { view?: "overview" | "integrations" }) {
   const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
   const [accountId, setAccountId] = useState("");
@@ -128,6 +128,7 @@ export function ClientPortal() {
         activeAccess={activeAccess}
         payoutOpen={payoutOpen}
         setPayoutOpen={setPayoutOpen}
+        view={view}
       />
     );
   }
