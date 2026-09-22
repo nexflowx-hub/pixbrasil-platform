@@ -50,6 +50,7 @@ type BusinessDashboardProps = Omit<DashboardProps, "activeAccess"> & {
   activeAccess: AccountAccess;
   payoutOpen: boolean;
   setPayoutOpen: (value: boolean) => void;
+  view: "overview" | "integrations";
 };
 
 type Movement = {
@@ -165,6 +166,7 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
           activeAccess={props.activeAccess}
           onNavigate={() => setMobileNavOpen(false)}
           onPayout={() => props.setPayoutOpen(true)}
+          view={props.view}
           mobile={false}
         />
 
@@ -186,82 +188,96 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
 
           <div className="px-4 py-6 sm:px-6 lg:px-7 2xl:px-8">
             <div className="mx-auto max-w-[1640px] space-y-4">
-              <DashboardHeader
-                today={today}
-                busy={props.busy}
-                refresh={props.refresh}
-                systemHealthy={systemHealthy}
-                pixStatus={operations.pixStatus}
-              />
+              {props.view === "integrations" ? (
+                <>
+                  <IntegrationsHeader
+                    merchantName={business?.merchant.trade_name || "Conta Business"}
+                  />
+                  {props.error ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
+                      {props.error}
+                    </div>
+                  ) : null}
+                  <DeveloperCenter
+                    accountId={props.accountId}
+                    stores={business?.stores ?? []}
+                    role={props.activeAccess.role}
+                  />
+                </>
+              ) : (
+                <>
+                  <DashboardHeader
+                    today={today}
+                    busy={props.busy}
+                    refresh={props.refresh}
+                    systemHealthy={systemHealthy}
+                    pixStatus={operations.pixStatus}
+                  />
 
-              {props.error ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
-                  {props.error}
-                </div>
-              ) : null}
+                  {props.error ? (
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
+                      {props.error}
+                    </div>
+                  ) : null}
 
-              <section
-                id="wallet"
-                className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-[3.2fr_1fr_1fr_1fr]"
-              >
-                <BusinessWalletHero
-                  available={summary.availableBrl}
-                  onPayout={() => props.setPayoutOpen(true)}
-                />
-                <MetricCard
-                  icon={CalendarDays}
-                  label="A liberar"
-                  value={brl(summary.pendingBrl)}
-                  description="Recebíveis das Stores em processo de liberação."
-                  tone="amber"
-                  onClick={() => scrollToSection("releases")}
-                />
-                <MetricCard
-                  icon={ShieldCheck}
-                  label="Reservado"
-                  value={brl(summary.reservedBrl)}
-                  description="Valores comprometidos com payouts, retenções ou ajustes."
-                  tone="blue"
-                  onClick={() => scrollToSection("payouts")}
-                />
-                <TotalManagedCard value={totalManaged} />
-              </section>
+                  <section
+                    id="wallet"
+                    className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-[3.2fr_1fr_1fr_1fr]"
+                  >
+                    <BusinessWalletHero
+                      available={summary.availableBrl}
+                      onPayout={() => props.setPayoutOpen(true)}
+                    />
+                    <MetricCard
+                      icon={CalendarDays}
+                      label="A liberar"
+                      value={brl(summary.pendingBrl)}
+                      description="Recebíveis das Stores em processo de liberação."
+                      tone="amber"
+                      onClick={() => scrollToSection("releases")}
+                    />
+                    <MetricCard
+                      icon={ShieldCheck}
+                      label="Reservado"
+                      value={brl(summary.reservedBrl)}
+                      description="Valores comprometidos com payouts, retenções ou ajustes."
+                      tone="blue"
+                      onClick={() => scrollToSection("payouts")}
+                    />
+                    <TotalManagedCard value={totalManaged} />
+                  </section>
 
-              <section
-                id="stores"
-                className="grid gap-3 2xl:grid-cols-[1.42fr_1fr]"
-              >
-                <StoreReleasePanel stores={filteredStores} />
-                <PixOperationsPanel
-                  operations={operations}
-                  settlements={business?.settlements ?? []}
-                  stores={business?.stores ?? []}
-                />
-              </section>
+                  <section
+                    id="stores"
+                    className="grid gap-3 2xl:grid-cols-[1.42fr_1fr]"
+                  >
+                    <StoreReleasePanel stores={filteredStores} />
+                    <PixOperationsPanel
+                      operations={operations}
+                      settlements={business?.settlements ?? []}
+                      stores={business?.stores ?? []}
+                    />
+                  </section>
 
-              <section className="grid gap-3 2xl:grid-cols-[1.18fr_1fr]">
-                <PerformancePanel {...performance} />
-                <QuickActions
-                  onPayout={() => props.setPayoutOpen(true)}
-                  financialWritesEnabled={
-                    props.overview?.capabilities.financialWritesEnabled ?? false
-                  }
-                />
-              </section>
+                  <section className="grid gap-3 2xl:grid-cols-[1.18fr_1fr]">
+                    <PerformancePanel {...performance} />
+                    <QuickActions
+                      onPayout={() => props.setPayoutOpen(true)}
+                      financialWritesEnabled={
+                        props.overview?.capabilities.financialWritesEnabled ?? false
+                      }
+                    />
+                  </section>
 
-              <section className="grid gap-3 2xl:grid-cols-[1.2fr_1fr]">
-                <MovementsPanel movements={movements} />
-                <CashflowPanel
-                  rows={business?.cashflow ?? []}
-                  available={summary.availableBrl}
-                />
-              </section>
-
-              <DeveloperCenter
-                accountId={props.accountId}
-                stores={business?.stores ?? []}
-                role={props.activeAccess.role}
-              />
+                  <section className="grid gap-3 2xl:grid-cols-[1.2fr_1fr]">
+                    <MovementsPanel movements={movements} />
+                    <CashflowPanel
+                      rows={business?.cashflow ?? []}
+                      available={summary.availableBrl}
+                    />
+                  </section>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -282,6 +298,7 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
               activeAccess={props.activeAccess}
               onNavigate={() => setMobileNavOpen(false)}
               onPayout={() => props.setPayoutOpen(true)}
+              view={props.view}
               mobile
             />
             <button
@@ -1045,9 +1062,8 @@ function QuickActions(props: {
           </div>
         </button>
 
-        <button
-          type="button"
-          onClick={() => scrollToSection("integrations")}
+        <a
+          href="/app/integrations"
           className="flex min-h-[72px] items-center gap-3 rounded-xl border border-[#E1E9E6] bg-white p-3 text-left transition hover:-translate-y-[1px] hover:bg-[#FBFCFC]"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F1F6F4] text-[#5B55C8]">
@@ -1059,7 +1075,7 @@ function QuickActions(props: {
               Chaves por Store e notificações
             </span>
           </div>
-        </button>
+        </a>
 
         <a
           href="/terminal"
