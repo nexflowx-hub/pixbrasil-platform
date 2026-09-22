@@ -9,13 +9,11 @@ import {
   Bell,
   Building2,
   CalendarDays,
-  CheckCircle2,
   ChevronDown,
   CircleHelp,
   Code2,
   CreditCard,
   FileText,
-  GitBranch,
   KeyRound,
   Landmark,
   Link2,
@@ -39,7 +37,6 @@ import type {
   DashboardProps,
   PaymentRow,
   PayoutRow,
-  ProviderHealth,
   SettlementRow,
   StoreRow
 } from "@/components/client/client-types";
@@ -75,7 +72,6 @@ const NAV_ITEMS = [
   ["Links de pagamento", Link2, "developers"],
   ["Liberações", CalendarDays, "releases"],
   ["Payouts", Send, "payouts"],
-  ["Routing", GitBranch, "gateway"],
   ["Desenvolvedores", Code2, "developers"],
   ["Relatórios", FileText, "cashflow"],
   ["Definições", Settings2, "account"]
@@ -104,8 +100,6 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
         return [
           store.code,
           store.name,
-          store.provider_code ?? "",
-          store.gateway_alias ?? "",
           store.release_class ?? "",
           store.status
         ].some((value) => value.toLowerCase().includes(normalizedSearch));
@@ -120,8 +114,6 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
         return [
           payment.external_reference ?? "",
           payment.store_code ?? "",
-          payment.provider_code ?? "",
-          payment.provider_payment_id ?? "",
           payment.status,
           payment.amount
         ].some((value) =>
@@ -138,12 +130,13 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
     (business?.settlements ?? []).filter((row) => row.status === "PENDING")
       .length;
 
-  const providers = business?.providerHealth ?? [];
-  const healthyProviders = providers.filter((provider) =>
-    ["HEALTHY", "ACTIVE", "ONLINE"].includes(provider.health.toUpperCase())
-  ).length;
-  const systemHealthy =
-    providers.length > 0 && healthyProviders === providers.length;
+  const operations = business?.operations ?? {
+    pixStatus: "UNKNOWN" as const,
+    payments30d: 0,
+    successful30d: 0,
+    successRate30d: null
+  };
+  const systemHealthy = operations.pixStatus === "OPERATIONAL";
 
   const totalManaged =
     summary.availableBrl + summary.pendingBrl + summary.reservedBrl;
@@ -161,7 +154,7 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
 
   const performance = buildPerformance(
     business?.payments ?? [],
-    business?.providerHealth ?? []
+    operations
   );
 
   return (
@@ -199,7 +192,7 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
                 busy={props.busy}
                 refresh={props.refresh}
                 systemHealthy={systemHealthy}
-                providerCount={providers.length}
+                pixStatus={operations.pixStatus}
               />
 
               {props.error ? (
@@ -240,7 +233,11 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
                 className="grid gap-3 2xl:grid-cols-[1.42fr_1fr]"
               >
                 <StoreReleasePanel stores={filteredStores} />
-                <GatewayRoutingPanel providers={providers} />
+                <PixOperationsPanel
+                  operations={operations}
+                  settlements={business?.settlements ?? []}
+                  stores={business?.stores ?? []}
+                />
               </section>
 
               <section className="grid gap-3 2xl:grid-cols-[1.18fr_1fr]">
@@ -500,7 +497,7 @@ function DashboardHeader(props: {
   busy: boolean;
   refresh: () => Promise<void>;
   systemHealthy: boolean;
-  providerCount: number;
+  pixStatus: "OPERATIONAL" | "DEGRADED" | "UNAVAILABLE" | "UNKNOWN";
 }) {
   return (
     <section
@@ -541,11 +538,13 @@ function DashboardHeader(props: {
               {props.systemHealthy ? "Sistema operacional" : "Estado operacional"}
             </strong>
             <span className="text-[8px]">
-              {props.providerCount
-                ? props.systemHealthy
-                  ? "Providers online"
-                  : "Verificar providers"
-                : "Aguardando telemetria"}
+              {props.pixStatus === "OPERATIONAL"
+                ? "Operação PIX normal"
+                : props.pixStatus === "DEGRADED"
+                  ? "Operação com atenção"
+                  : props.pixStatus === "UNAVAILABLE"
+                    ? "Operação indisponível"
+                    : "Aguardando atividade"}
             </span>
           </div>
         </div>
@@ -698,11 +697,10 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
     >
       {stores.length ? (
         <div className="premium-scrollbar overflow-x-auto">
-          <table className="w-full min-w-[790px] text-left text-[8px]">
+          <table className="w-full min-w-[700px] text-left text-[8px]">
             <thead>
               <tr className="border-b border-[#E3EBE8] text-[#748780]">
                 <th className="px-2 py-2.5 font-semibold">Store</th>
-                <th className="px-2 py-2.5 font-semibold">Provider</th>
                 <th className="px-2 py-2.5 font-semibold">Release</th>
                 <th className="px-2 py-2.5 font-semibold">Progresso</th>
                 <th className="px-2 py-2.5 font-semibold">Próxima liberação</th>
@@ -747,11 +745,6 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
                           </span>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <strong className="text-[#17815D]">
-                        {store.provider_code || "—"}
-                      </strong>
                     </td>
                     <td className="px-2 py-2.5">
                       <span className="rounded bg-[#EEF3F1] px-1.5 py-1 font-bold text-[#385149]">
@@ -803,153 +796,138 @@ function StoreReleasePanel({ stores }: { stores: StoreRow[] }) {
   );
 }
 
-function GatewayRoutingPanel({
-  providers
-}: {
-  providers: ProviderHealth[];
+function PixOperationsPanel(props: {
+  operations: {
+    pixStatus: "OPERATIONAL" | "DEGRADED" | "UNAVAILABLE" | "UNKNOWN";
+    payments30d: number;
+    successful30d: number;
+    successRate30d: string | null;
+  };
+  settlements: SettlementRow[];
+  stores: StoreRow[];
 }) {
-  const allHealthy =
-    providers.length > 0 &&
-    providers.every((provider) =>
-      ["HEALTHY", "ACTIVE", "ONLINE"].includes(provider.health.toUpperCase())
-    );
+  const activeStores = props.stores.filter((store) =>
+    ["ACTIVE", "ENABLED"].includes(store.status.toUpperCase())
+  ).length;
+  const pendingReleases = props.settlements.filter(
+    (row) => row.status.toUpperCase() === "PENDING"
+  ).length;
+  const status = props.operations.pixStatus;
+  const statusLabel =
+    status === "OPERATIONAL"
+      ? "Operação normal"
+      : status === "DEGRADED"
+        ? "Operação com atenção"
+        : status === "UNAVAILABLE"
+          ? "Operação indisponível"
+          : "Aguardando atividade";
+  const healthy = status === "OPERATIONAL";
 
   return (
     <Panel
-      id="gateway"
-      title="Gateway PIX & Routing"
-      icon={GitBranch}
-      action={allHealthy ? "Operação normal" : "Estado das rotas"}
+      id="operation"
+      title="Operação PIX"
+      icon={Activity}
+      action={statusLabel}
     >
-      <p className="-mt-1 mb-3 text-[8px] text-[#758881]">
-        Providers e roteamento em tempo real.
-      </p>
+      <div className="grid gap-3 lg:grid-cols-[1.08fr_.92fr]">
+        <div className="rounded-[14px] border border-[#DFE8E4] bg-[linear-gradient(145deg,#F9FCFB,#F3F8F6)] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className="text-[8px] font-bold uppercase tracking-[.12em] text-[#71847D]">
+                Infraestrutura PiXBrasil
+              </span>
+              <strong className="mt-2 block text-[15px] tracking-[-.025em] text-[#10231E]">
+                Pagamentos e liquidação
+              </strong>
+            </div>
+            <span
+              className={[
+                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[8px] font-bold",
+                healthy
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : status === "DEGRADED"
+                    ? "border-amber-200 bg-amber-50 text-amber-700"
+                    : "border-slate-200 bg-white text-slate-600"
+              ].join(" ")}
+            >
+              <span
+                className={[
+                  "h-2 w-2 rounded-full",
+                  healthy
+                    ? "bg-emerald-500"
+                    : status === "DEGRADED"
+                      ? "bg-amber-500"
+                      : "bg-slate-400"
+                ].join(" ")}
+              />
+              {statusLabel}
+            </span>
+          </div>
 
-      <div className="grid gap-3 xl:grid-cols-[1fr_180px]">
-        <div className="grid content-start gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-          {providers.length ? (
-            providers.map((provider) => (
-              <div
-                key={provider.gateway_alias}
-                className="rounded-xl border border-[#E0E9E6] bg-[#FBFCFC] p-3"
-              >
-                <div className="flex items-center justify-between">
-                  <strong className="text-[9px]">
-                    {provider.provider_code}
-                  </strong>
-                  <span className="flex items-center gap-1 text-[7px] text-emerald-700">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                    {provider.health}
-                  </span>
-                </div>
-                <span className="mt-1 block truncate text-[7px] text-[#84968F]">
-                  {provider.gateway_alias}
-                </span>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-[7px] text-[#62766F]">
-                  <span>
-                    Latência{" "}
-                    <strong>{provider.latency_ms ?? "—"} ms</strong>
-                  </span>
-                  <span className="text-right">
-                    Sucesso{" "}
-                    <strong>
-                      {provider.success_rate_30d == null
-                        ? "—"
-                        : Number(provider.success_rate_30d).toLocaleString(
-                            "pt-BR",
-                            { maximumFractionDigits: 2 }
-                          ) + "%"}
-                    </strong>
-                  </span>
-                  <span className="col-span-2 text-[#87968F]">
-                    {provider.attempts_30d || 0} tentativas ·{" "}
-                    {provider.successes_30d || 0} concluídas
-                  </span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <Empty label="Aguardando telemetria dos providers." />
-          )}
+          <div className="mt-5 grid grid-cols-3 divide-x divide-[#E1EAE6]">
+            <OperationMetric
+              label="Pagamentos 30d"
+              value={String(props.operations.payments30d)}
+            />
+            <OperationMetric
+              label="Concluídos"
+              value={String(props.operations.successful30d)}
+            />
+            <OperationMetric
+              label="Taxa de sucesso"
+              value={
+                props.operations.successRate30d == null
+                  ? "—"
+                  : Number(props.operations.successRate30d).toLocaleString("pt-BR", {
+                      maximumFractionDigits: 2
+                    }) + "%"
+              }
+            />
+          </div>
         </div>
 
-        <RoutingGraphic active={providers.length > 0} />
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+          <div className="rounded-[14px] border border-[#E1E9E6] bg-white p-4">
+            <span className="text-[8px] font-medium text-[#73867F]">
+              Stores ativas
+            </span>
+            <div className="mt-2 flex items-end justify-between">
+              <strong className="text-[24px] tracking-[-.04em]">
+                {activeStores}
+              </strong>
+              <Store className="h-5 w-5 text-[#13956B]" />
+            </div>
+          </div>
+          <div className="rounded-[14px] border border-[#E1E9E6] bg-white p-4">
+            <span className="text-[8px] font-medium text-[#73867F]">
+              Liberações pendentes
+            </span>
+            <div className="mt-2 flex items-end justify-between">
+              <strong className="text-[24px] tracking-[-.04em]">
+                {pendingReleases}
+              </strong>
+              <CalendarDays className="h-5 w-5 text-[#D89024]" />
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        {[
-          "Políticas por Store",
-          "Routing em tempo real",
-          "Monitoramento operacional"
-        ].map((label) => (
-          <div
-            key={label}
-            className="flex items-center gap-2 rounded-lg border border-[#E6EEEB] bg-[#FBFCFC] px-3 py-2 text-[7px] text-[#667A73]"
-          >
-            <CheckCircle2 className="h-3.5 w-3.5 text-[#10B981]" />
-            {label}
-          </div>
-        ))}
+      <div className="mt-3 flex items-center gap-2 rounded-xl border border-[#E2EAE7] bg-[#FAFCFB] px-3 py-2.5 text-[8px] text-[#6B7E77]">
+        <ShieldCheck className="h-4 w-4 text-[#13956B]" />
+        A infraestrutura de processamento é gerida pelo PiXBrasil. Sua conta mostra apenas o estado operacional e financeiro relevante.
       </div>
     </Panel>
   );
 }
 
-function RoutingGraphic({ active }: { active: boolean }) {
+function OperationMetric(props: { label: string; value: string }) {
   return (
-    <div className="relative flex min-h-[175px] items-center justify-center overflow-hidden rounded-xl border border-[#E5ECEA] bg-[radial-gradient(circle_at_center,rgba(20,230,161,.08),transparent_58%)]">
-      <svg
-        viewBox="0 0 180 175"
-        className="absolute inset-0 h-full w-full"
-        aria-hidden="true"
-      >
-        {[
-          [90, 14],
-          [148, 42],
-          [160, 92],
-          [142, 142],
-          [90, 158],
-          [38, 142],
-          [20, 92],
-          [34, 42]
-        ].map(([x, y], index) => (
-          <g key={index}>
-            <line
-              x1="90"
-              y1="87"
-              x2={x}
-              y2={y}
-              stroke={active ? "#79E7C4" : "#D5E3DE"}
-              strokeWidth="1"
-              strokeDasharray="3 4"
-            />
-            <circle
-              cx={x}
-              cy={y}
-              r="4"
-              fill={active ? "#A9F1D8" : "#E0E9E6"}
-            />
-          </g>
-        ))}
-        <circle
-          cx="90"
-          cy="87"
-          r="34"
-          fill={active ? "#E7FBF4" : "#F4F7F6"}
-          stroke={active ? "#9FEBD1" : "#DCE6E2"}
-        />
-      </svg>
-      <div className="relative z-10 text-center">
-        <GitBranch
-          className={
-            active
-              ? "mx-auto h-6 w-6 text-[#0FB87C]"
-              : "mx-auto h-6 w-6 text-[#8EA09A]"
-          }
-        />
-        <strong className="mt-2 block text-[10px]">PiXBrasil</strong>
-        <span className="text-[7px] text-[#71847D]">Smart Routing</span>
-      </div>
+    <div className="px-3 first:pl-0 last:pr-0">
+      <span className="block text-[7px] text-[#7A8D86]">{props.label}</span>
+      <strong className="mt-2 block text-[18px] tracking-[-.035em] text-[#132720]">
+        {props.value}
+      </strong>
     </div>
   );
 }
@@ -959,7 +937,7 @@ function PerformancePanel(props: {
   paymentCount30d: number;
   averageTicket: number;
   successRate: number | null;
-  averageLatency: number | null;
+  successful30d: number;
 }) {
   const metrics = [
     ["Volume PIX hoje", brl(props.volumeToday)],
@@ -973,10 +951,7 @@ function PerformancePanel(props: {
             maximumFractionDigits: 2
           }) + "%"
     ],
-    [
-      "Latência média",
-      props.averageLatency == null ? "—" : props.averageLatency + " ms"
-    ]
+    ["Concluídos (30d)", String(props.successful30d)]
   ];
 
   return (
@@ -1069,7 +1044,7 @@ function QuickActions(props: {
           className="flex min-h-[72px] items-center gap-3 rounded-xl border border-[#E1E9E6] bg-white p-3 transition hover:-translate-y-0.5 hover:bg-[#FBFCFC]"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F1F6F4] text-[#5B55C8]">
-            <GitBranch className="h-4 w-4" />
+            <Code2 className="h-4 w-4" />
           </span>
           <div>
             <strong className="block text-[9px]">API & Webhooks</strong>
@@ -1623,17 +1598,16 @@ function Field(props: { label: string; children: React.ReactNode }) {
 
 function buildPerformance(
   payments: PaymentRow[],
-  providers: ProviderHealth[]
+  operations: {
+    payments30d: number;
+    successful30d: number;
+    successRate30d: string | null;
+  }
 ) {
-  const now = Date.now();
-  const start30d = now - 30 * 24 * 60 * 60 * 1000;
   const startToday = new Date();
   startToday.setHours(0, 0, 0, 0);
 
-  const recent = payments.filter(
-    (row) => new Date(row.created_at).getTime() >= start30d
-  );
-  const successful = recent.filter((row) =>
+  const successful = payments.filter((row) =>
     ["SUCCEEDED", "PAID", "CONFIRMED"].includes(row.status.toUpperCase())
   );
   const today = successful.filter(
@@ -1648,35 +1622,19 @@ function buildPerformance(
     (sum, row) => sum + Number(row.amount || 0),
     0
   );
-  const paymentCount30d = recent.length;
   const averageTicket =
     successful.length > 0 ? totalSuccessful / successful.length : 0;
-
-  const attempts = providers.reduce(
-    (sum, provider) => sum + Number(provider.attempts_30d || 0),
-    0
-  );
-  const successes = providers.reduce(
-    (sum, provider) => sum + Number(provider.successes_30d || 0),
-    0
-  );
-  const successRate = attempts > 0 ? (successes / attempts) * 100 : null;
-
-  const latencies = providers
-    .map((provider) => provider.latency_ms)
-    .filter((value): value is number => value != null && Number.isFinite(value));
-  const averageLatency = latencies.length
-    ? Math.round(
-        latencies.reduce((sum, value) => sum + value, 0) / latencies.length
-      )
-    : null;
+  const successRate =
+    operations.successRate30d == null
+      ? null
+      : Number(operations.successRate30d);
 
   return {
     volumeToday,
-    paymentCount30d,
+    paymentCount30d: operations.payments30d,
     averageTicket,
-    successRate,
-    averageLatency
+    successRate: Number.isFinite(successRate) ? successRate : null,
+    successful30d: operations.successful30d
   };
 }
 
