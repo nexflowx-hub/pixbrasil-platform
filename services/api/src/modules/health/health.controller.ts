@@ -1,5 +1,5 @@
 import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
-import { APP_VERSION } from "../../config/build-info";
+import { APP_RELEASE, APP_VERSION } from "../../config/build-info";
 import { RuntimeHealthService } from "./runtime-health.service";
 
 @Controller("health")
@@ -13,6 +13,7 @@ export class HealthController {
       service: "PiXBrasil",
       component: "api",
       version: APP_VERSION,
+      release: APP_RELEASE,
       status: "ONLINE",
       timestamp: new Date().toISOString(),
     };
