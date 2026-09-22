@@ -541,19 +541,35 @@
 .finance-surface::before {
   content: "";
   pointer-events: none;
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(circle at 12% -15%, rgba(24, 201, 143, 0.055), transparent 31%),
-    linear-gradient(180deg, rgba(255,255,255,.64), rgba(246,249,248,.38));
+    radial-gradient(circle at 17% 0%, rgba(18, 201, 141, .07), transparent 28%),
+    radial-gradient(circle at 92% 32%, rgba(25, 157, 119, .045), transparent 26%),
+    repeating-linear-gradient(
+      132deg,
+      rgba(4, 73, 54, .012) 0,
+      rgba(4, 73, 54, .012) 1px,
+      transparent 1px,
+      transparent 24px
+    ),
+    linear-gradient(180deg, #F8FAF9, #F1F6F4 72%, #F4F7F6);
 }
 
 .finance-card {
   position: relative;
   overflow: hidden;
   background:
-    linear-gradient(145deg, rgba(255,255,255,.96), rgba(249,252,251,.91));
+    radial-gradient(circle at 8% -22%, rgba(25, 200, 142, .075), transparent 30%),
+    repeating-linear-gradient(
+      132deg,
+      rgba(10, 92, 68, .018) 0,
+      rgba(10, 92, 68, .018) 1px,
+      transparent 1px,
+      transparent 15px
+    ),
+    linear-gradient(145deg, rgba(255,255,255,.965), rgba(247,251,249,.925));
   border-color: rgba(203, 219, 213, .78) !important;
   box-shadow:
     0 1px 0 rgba(255,255,255,.96) inset,
@@ -630,7 +646,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  opacity: .28;
+  opacity: .48;
   background-image:
     linear-gradient(115deg, transparent 0 44%, rgba(255,255,255,.14) 48%, transparent 53%),
     repeating-linear-gradient(
@@ -646,6 +662,40 @@
   box-shadow:
     0 1px 0 rgba(255,255,255,.9) inset,
     0 8px 30px -26px rgba(13, 55, 43, .38);
+}
+
+.finance-sidebar {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 0% 12%, rgba(32,242,154,.10), transparent 28%),
+    repeating-linear-gradient(
+      132deg,
+      rgba(74,255,188,.035) 0,
+      rgba(74,255,188,.035) 1px,
+      transparent 1px,
+      transparent 18px
+    ),
+    linear-gradient(180deg,#031713 0%,#041D18 100%) !important;
+  box-shadow:
+    1px 0 0 rgba(122, 255, 208, .07) inset,
+    20px 0 50px -45px rgba(13, 90, 67, .55);
+}
+
+.finance-sidebar::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  opacity: .36;
+  background:
+    linear-gradient(110deg, transparent 0 48%, rgba(255,255,255,.025) 53%, transparent 59%);
+  mix-blend-mode: screen;
+}
+
+.finance-sidebar > * {
+  position: relative;
+  z-index: 1;
 }
 
 .terminal-shell {
