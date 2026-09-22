@@ -232,6 +232,11 @@ test("Business dashboard mantém hierarquia premium e não expõe providers", as
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
   expect(overflow).toBeLessThanOrEqual(2);
+
+  await page.screenshot({
+    path: "test-results/business-dashboard-1536.png",
+    fullPage: true,
+  });
 });
 
 test("Business dashboard mobile não cria overflow e mantém navegação acessível", async ({ page }) => {
@@ -273,4 +278,9 @@ test("Terminal móvel abre como POS e mantém infraestrutura interna invisível"
     () => document.documentElement.scrollWidth - window.innerWidth,
   );
   expect(overflow).toBeLessThanOrEqual(2);
+
+  await page.screenshot({
+    path: "test-results/terminal-mobile-390.png",
+    fullPage: true,
+  });
 });
