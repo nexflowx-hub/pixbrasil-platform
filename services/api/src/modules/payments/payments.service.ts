@@ -168,10 +168,15 @@ function merchantPixAction(value: unknown) {
 function merchantEconomics(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const quote = value as Record<string, unknown>;
+  const grossBrl = Number(quote.grossBrl ?? 0);
+  const estimatedMerchantNetBrl = Number(quote.estimatedMerchantNetBrl ?? 0);
   return {
-    grossBrl: Number(quote.grossBrl ?? 0),
-    platformFeeBrl: Number(quote.platformFeeBrl ?? 0),
-    estimatedMerchantNetBrl: Number(quote.estimatedMerchantNetBrl ?? 0),
+    grossBrl,
+    processingFeeBrl: Math.max(
+      0,
+      Math.round((grossBrl - estimatedMerchantNetBrl) * 100) / 100,
+    ),
+    estimatedMerchantNetBrl,
   };
 }
 
