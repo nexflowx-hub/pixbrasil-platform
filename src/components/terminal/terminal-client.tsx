@@ -132,7 +132,7 @@ export function TerminalClient() {
     }
     setOverview(body.data);
     return body.data;
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     let active = true;
