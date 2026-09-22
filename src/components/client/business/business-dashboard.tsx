@@ -2,7 +2,6 @@
 
 import {
   Activity,
-  ArrowDownRight,
   ArrowDownToLine,
   ArrowRight,
   ArrowUpRight,
@@ -36,7 +35,6 @@ import { FormEvent, useMemo, useState } from "react";
 import { BrandLogo } from "@/components/brand/logo";
 import type {
   AccountAccess,
-  BusinessData,
   CashflowRow,
   DashboardProps,
   PaymentRow,
