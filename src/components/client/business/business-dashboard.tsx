@@ -155,7 +155,7 @@ export function BusinessDashboard(props: BusinessDashboardProps) {
   );
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#F7F9F8_0%,#F3F6F5_100%)] text-[#0A1614]">
+    <main className="finance-surface min-h-screen bg-[linear-gradient(180deg,#F7F9F8_0%,#F3F6F5_100%)] text-[#0A1614]">
       <div className="grid min-h-screen lg:grid-cols-[252px_1fr]">
         <BusinessSidebar
           session={props.session}
@@ -324,7 +324,7 @@ function BusinessTopbar(props: {
   settlements: SettlementRow[];
 }) {
   return (
-    <header className="sticky top-0 z-40 flex h-[68px] items-center gap-3 border-b border-[#E0E7E4] bg-white/96 px-4 shadow-[0_1px_0_rgba(18,51,42,.02)] backdrop-blur-xl sm:px-5 lg:px-7">
+    <header className="finance-topbar sticky top-0 z-40 flex h-[68px] items-center gap-3 border-b border-[#E0E7E4] bg-white/90 px-4 shadow-[0_1px_0_rgba(18,51,42,.02)] backdrop-blur-xl sm:px-5 lg:px-7">
       <button
         onClick={props.openMobileNav}
         className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#DCE6E2] text-[#27463E] lg:hidden"
@@ -576,7 +576,7 @@ function BusinessWalletHero(props: {
   onPayout: () => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-[16px] bg-[radial-gradient(circle_at_96%_100%,rgba(20,230,161,.20),transparent_34%),linear-gradient(125deg,#073A30,#04251F)] p-6 text-white shadow-[0_18px_44px_rgba(5,52,42,.16)] xl:col-span-2 2xl:col-span-1">
+    <article className="finance-hero finance-press overflow-hidden rounded-[16px] bg-[radial-gradient(circle_at_96%_100%,rgba(20,230,161,.20),transparent_34%),linear-gradient(125deg,#073A30,#04251F)] p-6 text-white shadow-[0_18px_44px_rgba(5,52,42,.16)] xl:col-span-2 2xl:col-span-1">
       <div className="grid h-full gap-5 md:grid-cols-[1fr_190px] md:items-center">
         <div>
           <div className="flex items-center gap-2 text-[12px] font-bold uppercase tracking-[.11em] text-[#B7D5CD]">
@@ -655,7 +655,7 @@ function MetricCard(props: {
   return (
     <button
       onClick={props.onClick}
-      className="group min-h-[198px] rounded-[14px] border border-[#DEE7E3] bg-white p-5 text-left shadow-[0_8px_24px_rgba(28,63,54,.035)] transition hover:-translate-y-[1px] hover:border-[#C9D8D2] hover:shadow-[0_12px_30px_rgba(28,63,54,.07)]"
+      className="finance-card finance-press group min-h-[198px] rounded-[14px] border border-[#DEE7E3] bg-white p-5 text-left shadow-[0_8px_24px_rgba(28,63,54,.035)] transition hover:-translate-y-[1px] hover:border-[#C9D8D2] hover:shadow-[0_12px_30px_rgba(28,63,54,.07)]"
     >
       <div className="flex items-center justify-between">
         <span className={"flex h-10 w-10 items-center justify-center rounded-lg " + tone}>
@@ -676,7 +676,7 @@ function MetricCard(props: {
 
 function TotalManagedCard({ value }: { value: number }) {
   return (
-    <article className="min-h-[198px] rounded-[14px] border border-[#DEE7E3] bg-white p-5 shadow-[0_8px_24px_rgba(28,63,54,.035)]">
+    <article className="finance-card min-h-[198px] rounded-[14px] border border-[#DEE7E3] bg-white p-5 shadow-[0_8px_24px_rgba(28,63,54,.035)]">
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#E5FAF1] text-[#109B69]">
         <BarChart3 className="h-5 w-5" />
       </div>
@@ -1389,7 +1389,7 @@ function Panel(props: {
   return (
     <section
       id={props.id}
-      className="overflow-hidden rounded-[14px] border border-[#DEE7E3] bg-white shadow-[0_10px_30px_rgba(28,63,54,.045)]"
+      className="finance-card overflow-hidden rounded-[14px] border border-[#DEE7E3] bg-white shadow-[0_10px_30px_rgba(28,63,54,.045)]"
     >
       <div className="flex min-h-[54px] items-center justify-between border-b border-[#E8EEEC] px-5 py-3.5">
         <div className="flex items-center gap-2">
