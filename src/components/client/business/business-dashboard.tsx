@@ -24,6 +24,7 @@ import {
   Send,
   ShieldCheck,
   Store,
+  Smartphone,
   WalletCards,
   X
 } from "lucide-react";
@@ -1059,6 +1060,21 @@ function QuickActions(props: {
             </span>
           </div>
         </button>
+
+        <a
+          href="/terminal"
+          className="flex min-h-[72px] items-center gap-3 rounded-xl border border-[#D9EEE6] bg-[linear-gradient(145deg,#F0FBF6,#E8F8F2)] p-3 transition hover:-translate-y-[1px] hover:shadow-[0_10px_24px_rgba(18,120,86,.08)]"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#073A30] text-[#4EF0B6]">
+            <Smartphone className="h-4 w-4" />
+          </span>
+          <div>
+            <strong className="block text-[12px]">Terminal móvel</strong>
+            <span className="mt-1 block text-[11px] text-[#70837C]">
+              Cobrança presencial no celular
+            </span>
+          </div>
+        </a>
       </div>
     </Panel>
   );
