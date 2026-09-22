@@ -17,6 +17,10 @@ import { isIP } from "node:net";
 import { DatabaseService } from "../database/database.service";
 import type { MerchantApiContext } from "../merchant-auth/merchant-auth.types";
 
+type MerchantWebhookActor = Pick<MerchantApiContext, "merchantId" | "merchantCode"> & {
+  apiKeyId?: string | null;
+};
+
 const PAYMENT_EVENTS = [
   "payment.pending",
   "payment.succeeded",
@@ -209,7 +213,7 @@ export class MerchantWebhooksService implements OnModuleInit, OnModuleDestroy {
     if (this.retryTimer) clearInterval(this.retryTimer);
   }
 
-  async listEndpoints(merchant: MerchantApiContext) {
+  async listEndpoints(merchant: MerchantWebhookActor) {
     const result = await this.database.query<EndpointRow>(
       `
       select
@@ -247,7 +251,7 @@ export class MerchantWebhooksService implements OnModuleInit, OnModuleDestroy {
   }
 
   async createEndpoint(
-    merchant: MerchantApiContext,
+    merchant: MerchantWebhookActor,
     body: Record<string, unknown>,
   ) {
     const endpointUrl = await validateEndpointUrl(
@@ -331,7 +335,7 @@ export class MerchantWebhooksService implements OnModuleInit, OnModuleDestroy {
           vaultSecretId,
           fingerprint,
           events,
-          merchant.apiKeyId,
+          merchant.apiKeyId ?? null,
         ],
       );
       inserted = result.rows[0];
@@ -360,7 +364,7 @@ export class MerchantWebhooksService implements OnModuleInit, OnModuleDestroy {
   }
 
   async revokeEndpoint(
-    merchant: MerchantApiContext,
+    merchant: MerchantWebhookActor,
     endpointId: string,
   ) {
     const result = await this.database.query<{ id: string }>(
@@ -387,7 +391,7 @@ export class MerchantWebhooksService implements OnModuleInit, OnModuleDestroy {
   }
 
   async testEndpoint(
-    merchant: MerchantApiContext,
+    merchant: MerchantWebhookActor,
     endpointId: string,
   ) {
     const endpoint = await this.loadEndpointWithSecret(
