@@ -5,19 +5,18 @@ import {
   Delete,
   Check,
   ChevronDown,
-  Clipboard,
   Copy,
   LoaderCircle,
   QrCode,
   RefreshCw,
   Settings2,
   Share2,
-  ShoppingBag,
   Smartphone,
   Store,
   XCircle,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand/logo";
 import type {
   OverviewData,
@@ -80,13 +79,14 @@ function paymentFailed(status: string) {
 }
 
 export function TerminalClient() {
+  const router = useRouter();
   const [session, setSession] = useState<SessionData | null>(null);
   const [accountId, setAccountId] = useState("");
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [storeCode, setStoreCode] = useState("");
   const [terminalName, setTerminalName] = useState("Caixa 1");
   const [amountCents, setAmountCents] = useState("0");
-  const [payerName, setPayerName] = useState("Cliente");
+  const [payerName] = useState("Cliente");
   const [payerTaxId, setPayerTaxId] = useState("");
   const [description, setDescription] = useState("");
   const [payment, setPayment] = useState<TerminalPayment | null>(null);
@@ -97,16 +97,6 @@ export function TerminalClient() {
   const [successFlash, setSuccessFlash] = useState(false);
 
   const amount = Number(amountCents || 0) / 100;
-
-  const businessAccess = useMemo(
-    () =>
-      session?.accounts.find(
-        (account) =>
-          account.accountId === accountId &&
-          account.accountType === "BUSINESS",
-      ),
-    [accountId, session],
-  );
 
   const stores = useMemo(
     () =>
@@ -132,7 +122,7 @@ export function TerminalClient() {
       { cache: "no-store" },
     );
     if (response.status === 401) {
-      window.location.assign("/login?next=%2Fterminal");
+      router.replace("/login?next=%2Fterminal");
       return null;
     }
     const body = (await response.json()) as OverviewPayload;
@@ -145,31 +135,32 @@ export function TerminalClient() {
 
   useEffect(() => {
     let active = true;
-    const storedTerminal =
-      typeof window !== "undefined"
-        ? localStorage.getItem("pixbrasil:terminal:name")
-        : null;
-    if (storedTerminal) setTerminalName(storedTerminal);
 
-    fetch("/api/client/session", { cache: "no-store" })
-      .then(async (response) => {
+    void Promise.resolve().then(async () => {
+      const storedTerminal = localStorage.getItem("pixbrasil:terminal:name");
+      if (active && storedTerminal) setTerminalName(storedTerminal);
+
+      try {
+        const response = await fetch("/api/client/session", {
+          cache: "no-store",
+        });
         if (response.status === 401) {
-          window.location.assign("/login?next=%2Fterminal");
-          return null;
+          router.replace("/login?next=%2Fterminal");
+          return;
         }
+
         const body = (await response.json()) as SessionPayload;
         if (!response.ok) throw new Error("Sessão indisponível.");
-        return body.data;
-      })
-      .then(async (data) => {
-        if (!active || !data) return;
-        setSession(data);
-        const business = data.accounts.find(
+        if (!active) return;
+
+        setSession(body.data);
+        const business = body.data.accounts.find(
           (account) => account.accountType === "BUSINESS",
         );
         if (!business) {
           throw new Error("Esta conta não possui acesso Business.");
         }
+
         setAccountId(business.accountId);
         const loaded = await loadOverview(business.accountId);
         if (!active || !loaded) return;
@@ -182,21 +173,20 @@ export function TerminalClient() {
           activeStores.find((store) => store.code === storedStore) ??
           activeStores[0];
         if (preferred) setStoreCode(preferred.code);
-      })
-      .catch((cause: unknown) => {
+      } catch (cause) {
         if (!active) return;
         setError(
           cause instanceof Error ? cause.message : "Falha ao abrir terminal.",
         );
-      })
-      .finally(() => {
+      } finally {
         if (active) setBusy(false);
-      });
+      }
+    });
 
     return () => {
       active = false;
     };
-  }, [loadOverview]);
+  }, [loadOverview, router]);
 
   useEffect(() => {
     if (storeCode) {
