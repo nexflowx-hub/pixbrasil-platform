@@ -147,6 +147,34 @@ function normalizeMetadata(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+
+function merchantPixAction(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const action = value as Record<string, unknown>;
+  return {
+    type: "PIX",
+    ...(String(action.copyPaste ?? "").trim()
+      ? { copyPaste: String(action.copyPaste).trim() }
+      : {}),
+    ...(String(action.qrCodeImage ?? "").trim()
+      ? { qrCodeImage: String(action.qrCodeImage).trim() }
+      : {}),
+    ...(String(action.expiresAt ?? "").trim()
+      ? { expiresAt: String(action.expiresAt).trim() }
+      : {}),
+  };
+}
+
+function merchantEconomics(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const quote = value as Record<string, unknown>;
+  return {
+    grossBrl: Number(quote.grossBrl ?? 0),
+    platformFeeBrl: Number(quote.platformFeeBrl ?? 0),
+    estimatedMerchantNetBrl: Number(quote.estimatedMerchantNetBrl ?? 0),
+  };
+}
+
 @Injectable()
 export class PaymentsService {
   constructor(
@@ -241,24 +269,15 @@ export class PaymentsService {
           code: row.store_code,
           name: row.store_name,
         },
-        routing: {
-          providerCode: row.provider_code,
-          gatewayAlias: row.gateway_alias,
-          mode: row.metadata?.routingMode ?? null,
-          releaseClass: row.metadata?.releaseClass ?? null,
-        },
-        provider: row.provider_payment_id
-          ? {
-              paymentId: row.provider_payment_id,
-              attemptStatus: row.provider_attempt_status,
-              ambiguous: Boolean(row.ambiguous),
-            }
-          : null,
-        action: row.metadata?.providerAction ?? null,
-        economics:
+        action: merchantPixAction(row.metadata?.providerAction),
+        economics: merchantEconomics(
           row.metadata?.productionQuote ??
-          row.metadata?.shadowQuote ??
-          null,
+            row.metadata?.shadowQuote ??
+            null,
+        ),
+        release: {
+          class: row.metadata?.releaseClass ?? null,
+        },
         createdAt: row.created_at,
         updatedAt: row.updated_at,
         completedAt: row.completed_at,
@@ -754,19 +773,9 @@ export class PaymentsService {
           code: config.store_code,
           name: config.store_name,
         },
-        routing: {
-          mode: "SHADOW",
-          policy: config.policy_name,
-          policyVersion: config.policy_version,
-          providerCode: selectedRow.provider_code,
-          gatewayAlias: selectedRow.gateway_alias,
-          releaseClass: config.release_class,
-          crossReleaseClassFailover: false,
-        },
-        economics: quote,
+        economics: merchantEconomics(quote),
         release: {
-          profile: config.release_profile_code,
-          rules: releaseRules.rows,
+          class: config.release_class,
         },
       },
     };
@@ -852,24 +861,15 @@ export class PaymentsService {
           code: row.store_code,
           name: row.store_name,
         },
-        routing: {
-          mode: "SHADOW",
-          policy: row.policy_name,
-          providerCode: row.provider_code,
-          gatewayAlias: row.gateway_alias,
-          releaseClass: row.metadata?.releaseClass ?? null,
-        },
-        provider: row.provider_payment_id
-          ? {
-              paymentId: row.provider_payment_id,
-              attemptStatus: row.provider_attempt_status,
-            }
-          : null,
-        action: row.metadata?.providerAction ?? null,
-        economics:
+        action: merchantPixAction(row.metadata?.providerAction),
+        economics: merchantEconomics(
           row.metadata?.productionQuote ??
-          row.metadata?.shadowQuote ??
-          null,
+            row.metadata?.shadowQuote ??
+            null,
+        ),
+        release: {
+          class: row.metadata?.releaseClass ?? null,
+        },
       },
     };
   }
