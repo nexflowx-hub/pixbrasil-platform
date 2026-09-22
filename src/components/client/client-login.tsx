@@ -53,20 +53,20 @@ export function ClientLogin() {
           <div className="max-w-xl pb-10">
             <span className="inline-flex items-center gap-2 rounded-full border border-[#20F29A]/20 bg-[#20F29A]/6 px-3 py-1.5 text-[11px] font-semibold tracking-[.13em] text-[#79D9BA]">
               <ShieldCheck className="h-3.5 w-3.5" />
-              CLIENT PORTAL · MVP CONTROLADO
+              CLIENT PORTAL · PRODUÇÃO
             </span>
             <h1 className="mt-7 text-5xl font-semibold leading-[1.03] tracking-[-.055em] xl:text-6xl">
-              Uma visão clara do seu dinheiro, sem esconder o estado operacional.
+              Controle financeiro e operacional para contas PiXBrasil.
             </h1>
             <p className="mt-6 max-w-lg text-[15px] leading-7 text-[#8FA7A1]">
-              Acesse contas Personal e Business, wallets, Stores e atividade a partir do mesmo portal. Operações financeiras permanecem bloqueadas até a ativação segura de cada rail.
+              Acesse contas Particular e Business, acompanhe wallets, Stores, pagamentos PIX, liberações e atividade financeira num único portal.
             </p>
           </div>
 
           <div className="grid grid-cols-3 gap-3 pb-3">
             {[
               ["Sessão", "HttpOnly"],
-              ["Core", "Read-only"],
+              ["Operação", "Produção"],
               ["Dados", "Minimizados"],
             ].map(([label, value]) => (
               <div key={label} className="rounded-2xl border border-white/8 bg-white/[.025] p-4">
@@ -89,7 +89,7 @@ export function ClientLogin() {
               </div>
               <h2 className="mt-6 text-3xl font-semibold tracking-[-.045em]">Entrar no PiXBrasil</h2>
               <p className="mt-2 text-[13px] leading-6 text-[#7F9791]">
-                Use a identidade autorizada para acessar o Client Portal.
+                Use a sua identidade autorizada para acessar o PiXBrasil.
               </p>
 
               <form onSubmit={submit} className="mt-7 space-y-4">
