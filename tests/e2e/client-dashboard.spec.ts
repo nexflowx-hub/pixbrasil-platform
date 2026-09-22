@@ -266,7 +266,7 @@ test("Terminal móvel abre como POS e mantém infraestrutura interna invisível"
 
   await expect(page.getByRole("heading", { name: "Terminal PIX" })).toBeVisible();
   await expect(page.getByText("Cobrança presencial", { exact: true })).toBeVisible();
-  await expect(page.getByText("Signum", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("combobox")).toHaveValue("SIGNUM");
   await expect(page.getByRole("button", { name: "Cobrar agora" })).toBeVisible();
 
   const body = (await page.locator("body").innerText()).toLowerCase();
