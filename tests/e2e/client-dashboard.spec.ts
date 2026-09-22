@@ -210,8 +210,8 @@ test("Business dashboard mantém hierarquia premium e não expõe providers", as
     .boundingBox();
   const pending = await page.getByRole("button", { name: /A liberar/i }).boundingBox();
 
-  expect(sidebar?.width ?? 0).toBeGreaterThanOrEqual(245);
-  expect(sidebar?.width ?? 999).toBeLessThanOrEqual(260);
+  expect(sidebar?.width ?? 0).toBeGreaterThanOrEqual(238);
+  expect(sidebar?.width ?? 999).toBeLessThanOrEqual(242);
   expect(topbar?.height ?? 0).toBeGreaterThanOrEqual(64);
   expect(topbar?.height ?? 999).toBeLessThanOrEqual(72);
   expect(wallet?.width ?? 0).toBeGreaterThan(450);
