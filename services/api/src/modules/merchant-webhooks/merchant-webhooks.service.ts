@@ -53,6 +53,32 @@ interface DeliveryPayment {
   metadata?: Record<string, unknown> | null;
 }
 
+function merchantMetadata(
+  value: Record<string, unknown> | null | undefined,
+) {
+  if (!value) return {};
+
+  const internalKeys = new Set([
+    "routingMode",
+    "routingDecisionId",
+    "productionQuote",
+    "shadowQuote",
+    "releaseProfile",
+    "releaseClass",
+    "providerAction",
+    "providerPaymentId",
+    "providerError",
+    "reconciliationReason",
+    "lastVerifiedProviderStatus",
+    "lastVerifiedProvider",
+    "lastWebhookAt",
+  ]);
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([key]) => !internalKeys.has(key)),
+  );
+}
+
 function readEvents(value: unknown): PaymentEventType[] {
   if (value == null) return [...PAYMENT_EVENTS];
   if (!Array.isArray(value)) {
@@ -447,12 +473,8 @@ export class MerchantWebhooksService implements OnModuleInit, OnModuleDestroy {
           store: {
             code: payment.storeCode,
           },
-          provider: {
-            code: payment.providerCode,
-            paymentId: payment.providerPaymentId,
-          },
           completedAt: payment.completedAt,
-          metadata: payment.metadata ?? {},
+          metadata: merchantMetadata(payment.metadata),
         },
       };
 
