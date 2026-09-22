@@ -11,7 +11,7 @@ function PixSymbol({ className }: { className?: string }) {
 }
 
 const STEPS = [
-  { number: 1, icon: PixSymbol, title: "PIX", description: "A entrada é confirmada pelo provider" },
+  { number: 1, icon: PixSymbol, title: "PIX", description: "A entrada é confirmada pela infraestrutura PiXBrasil" },
   { number: 2, icon: ArrowLeftRight, title: "Conversão", description: "A rota de conversão é registrada e conciliada" },
   { number: 3, icon: Layers3, title: "Blockchain", description: "O ativo é mantido no rail digital aplicável" },
   { number: 4, icon: Wallet, title: "Saída", description: "Retirada em BRL ou cripto, conforme disponibilidade" },
