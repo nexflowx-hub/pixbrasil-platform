@@ -179,6 +179,16 @@ async function mockBusiness(page: Page) {
       body: JSON.stringify(overview),
     });
   });
+  await page.route("**/api/client/accounts/*/developer", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        data: { apiKeys: [], webhooks: [] },
+      }),
+    });
+  });
 }
 
 test("Business dashboard mantém hierarquia premium e não expõe providers", async ({ page }) => {
@@ -189,6 +199,7 @@ test("Business dashboard mantém hierarquia premium e não expõe providers", as
   await expect(page.getByRole("heading", { name: "Visão geral financeira" })).toBeVisible();
   await expect(page.getByText("Wallet BRL empresarial", { exact: false })).toBeVisible();
   await expect(page.getByText("Operação PIX", { exact: true })).toBeVisible();
+  await expect(page.getByText("API Keys & Webhooks", { exact: true })).toBeVisible();
 
   const body = await page.locator("body").innerText();
   for (const forbidden of [
@@ -240,4 +251,26 @@ test("Business dashboard mobile não cria overflow e mantém navegação acessí
   await menu.click();
   await expect(page.getByRole("button", { name: "Fechar menu" }).last()).toBeVisible();
   await expect(page.locator("aside").last()).toBeVisible();
+});
+
+
+test("Terminal móvel abre como POS e mantém infraestrutura interna invisível", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockBusiness(page);
+  await page.goto("/terminal");
+
+  await expect(page.getByRole("heading", { name: "Terminal PIX" })).toBeVisible();
+  await expect(page.getByText("Cobrança presencial", { exact: true })).toBeVisible();
+  await expect(page.getByText("Signum", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cobrar agora" })).toBeVisible();
+
+  const body = (await page.locator("body").innerText()).toLowerCase();
+  for (const forbidden of ["misticpay", "pixgo", "provider", "gateway"]) {
+    expect(body).not.toContain(forbidden);
+  }
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - window.innerWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(2);
 });
