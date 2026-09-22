@@ -3,7 +3,7 @@
   "info": {
     "title": "PiXBrasil Merchant API",
     "version": "1.0.0",
-    "description": "Production server-side merchant API for PIX PaymentIntents, provider execution, status and signed merchant webhooks."
+    "description": "Production server-side merchant API for PIX PaymentIntents, status, PIX actions and signed merchant webhooks."
   },
   "servers": [
     {
@@ -163,7 +163,7 @@
         },
         "responses": {
           "200": {
-            "description": "PIX PaymentIntent created or replayed idempotently. Production Stores return provider payment details and PIX action data."
+            "description": "PIX PaymentIntent created or replayed idempotently. Production Stores return the PIX action data required by the merchant."
           },
           "400": {
             "description": "Invalid request."
@@ -199,7 +199,7 @@
         ],
         "responses": {
           "200": {
-            "description": "PaymentIntent status and routing/provider summary."
+            "description": "PaymentIntent status, Store, release and customer-relevant financial summary."
           },
           "404": {
             "description": "Not found or not granted to the API key."
