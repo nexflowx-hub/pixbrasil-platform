@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 const createRequest = "POST /api/v1/payments/charge\nAuthorization: Bearer pix_live_...\nIdempotency-Key: order-8472-pix-1\nContent-Type: application/json\n\n{\n  \"store\": \"SIGNUM\",\n  \"amount\": 149.90,\n  \"currency\": \"BRL\",\n  \"reference\": \"ORDER-8472\",\n  \"description\": \"SIGNUM 312\",\n  \"payer\": {\n    \"name\": \"Cliente Exemplo\",\n    \"taxId\": \"CPF_OU_CNPJ_VALIDO\",\n    \"email\": \"cliente@example.com\",\n    \"phone\": \"+55...\"\n  },\n  \"metadata\": {\n    \"orderId\": \"8472\",\n    \"attribution\": {\n      \"utm_source\": \"meta\",\n      \"utm_medium\": \"paid\",\n      \"utm_campaign\": \"launch\"\n    }\n  }\n}";
 
-const liveResponse = "{\n  \"success\": true,\n  \"data\": {\n    \"paymentIntentId\": \"uuid\",\n    \"idempotentReplay\": false,\n    \"status\": \"PENDING_PAYMENT\",\n    \"amount\": 149.90,\n    \"currency\": \"BRL\",\n    \"reference\": \"ORDER-8472\",\n    \"store\": {\n      \"code\": \"SIGNUM\",\n      \"name\": \"Signum\"\n    },\n    \"routing\": {\n      \"mode\": \"LIVE\",\n      \"policy\": \"NS-SIGNUM-PIX-D0\",\n      \"providerCode\": \"MISTICPAY\",\n      \"gatewayAlias\": \"misticpay-primary\",\n      \"releaseClass\": \"D0\",\n      \"crossReleaseClassFailover\": false\n    },\n    \"provider\": {\n      \"paymentId\": \"provider-payment-id\",\n      \"recovered\": false\n    },\n    \"action\": {\n      \"type\": \"PIX\",\n      \"providerCode\": \"MISTICPAY\",\n      \"copyPaste\": \"000201...\",\n      \"qrCodeImage\": \"data:image/png;base64,...\"\n    },\n    \"economics\": {\n      \"grossBrl\": 149.90,\n      \"providerRouteCostBrl\": 8.99,\n      \"platformFeeBrl\": 0,\n      \"estimatedMerchantNetBrl\": 140.91\n    },\n    \"release\": {\n      \"profile\": \"PIX_D0\"\n    }\n  }\n}";
+const liveResponse = "{\n  \"success\": true,\n  \"data\": {\n    \"paymentIntentId\": \"uuid\",\n    \"idempotentReplay\": false,\n    \"status\": \"PENDING_PAYMENT\",\n    \"amount\": 149.90,\n    \"currency\": \"BRL\",\n    \"reference\": \"ORDER-8472\",\n    \"store\": {\n      \"code\": \"SIGNUM\",\n      \"name\": \"Signum\"\n    },\n    \"action\": {\n      \"type\": \"PIX\",\n      \"copyPaste\": \"000201...\",\n      \"qrCodeImage\": \"data:image/png;base64,...\"\n    },\n    \"economics\": {\n      \"grossBrl\": 149.90,\n      \"platformFeeBrl\": 0,\n      \"estimatedMerchantNetBrl\": 140.91\n    },\n    \"release\": {\n      \"class\": \"D0\"\n    }\n  }\n}"
 
 const getPayment = "GET /api/v1/payments/{paymentIntentId}\nAuthorization: Bearer pix_live_...";
 
@@ -36,7 +36,7 @@ export default function ApiDocsPage() {
         </p>
       </DocsSection>
 
-      <DocsSection id="create" title="POST /payments/charge" description="Cria um PaymentIntent idempotente e resolve Store → policy → provider → economics → release.">
+      <DocsSection id="create" title="POST /payments/charge" description="Cria um PaymentIntent idempotente, aplica as regras da Store e devolve a instrução PIX e a previsão financeira relevante.">
         <CopyBlock label="Request" language="http" code={createRequest} />
         <div className="mt-4"><CopyBlock label="Production response" language="json" code={liveResponse} /></div>
         <div className="mt-4 rounded-2xl border border-[#20F29A]/16 bg-[#20F29A]/4 p-4 text-[9px] leading-5 text-[#7FB9A8]">
