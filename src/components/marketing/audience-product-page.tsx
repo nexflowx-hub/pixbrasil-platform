@@ -6,7 +6,6 @@ import {
   CircleDashed,
   Clock3,
   Code2,
-  GitBranch,
   LockKeyhole,
   ShieldCheck,
   Store,
@@ -40,20 +39,20 @@ const content = {
   },
   business: {
     eyebrow: "PIXBRASIL BUSINESS",
-    title: "Uma camada de controle para PIX, Stores e routing.",
+    title: "Uma camada de controle para PIX, Stores e liquidação.",
     description:
-      "Empresas recebem PIX em produção, acompanham Stores, provider selecionado, liberação, Wallet BRL, PaymentIntents e payouts no mesmo ambiente operacional.",
+      "Empresas recebem PIX em produção, acompanham Stores, liberações, Wallet BRL, PaymentIntents e payouts no mesmo ambiente operacional.",
     icon: Building2,
     capabilities: [
       ["Client Portal Business", "AVAILABLE", "Account switch e visão merchant/store real."],
-      ["Stores e routing", "AVAILABLE", "Provider, gateway, D0/D1 e release profile por Store."],
-      ["API PIX S2S", "AVAILABLE", "Criação de PIX real com idempotência e routing por Store."],
-      ["PIX live", "AVAILABLE", "Provider create, webhook verificado, settlement e Wallet BRL."],
-      ["Payouts", "AVAILABLE", "Pedidos operacionais por ticket manual; automação entra na próxima etapa."],
+      ["Stores e liberações", "AVAILABLE", "Regras D0/D1, recebíveis e saldo disponível por Store."],
+      ["API PIX S2S", "AVAILABLE", "Criação de PIX real com idempotência e escopo por Store."],
+      ["PIX live", "AVAILABLE", "Cobrança, confirmação verificada, settlement e Wallet BRL."],
+      ["Payouts", "AVAILABLE", "Solicitações de payout acompanhadas diretamente no Client Portal."],
     ],
     highlights: [
-      [Store, "Store-scoped", "Cada operação pode ter provider, custos e release diferentes."],
-      [GitBranch, "Routing explícito", "D0/D1 não fazem fallback cruzado por acidente."],
+      [Store, "Store-scoped", "Cada Store mantém regras comerciais e liberações independentes."],
+      [ShieldCheck, "Infraestrutura abstraída", "A complexidade de processamento fica encapsulada no PiXBrasil."],
       [Code2, "S2S isolado", "API Keys com hash SHA-256 e grants por Store."],
     ],
   },
@@ -132,7 +131,7 @@ export function AudienceProductPage({ audience }: { audience: Audience }) {
               <span className="text-[9px] font-bold uppercase tracking-[.14em] text-[#C7A95A]">TRANSPARÊNCIA OPERACIONAL</span>
               <h2 className="mt-2 text-2xl font-semibold tracking-[-.04em]">Nenhuma feature é chamada de “ativa” antes de estar operacional.</h2>
               <p className="mt-3 max-w-3xl text-[10px] leading-5 text-[#8D826A]">
-                O PiXBrasil apresenta o estado operacional real de cada capacidade, Store, provider, settlement e payout tanto no Client Portal como no Control Plane.
+                O PiXBrasil apresenta ao cliente apenas o estado operacional e financeiro relevante de cada capacidade, Store, settlement e payout. A infraestrutura interna permanece no Control Plane.
               </p>
             </div>
             <Link href="/how-it-works" className="mt-5 inline-flex shrink-0 items-center gap-2 text-[11px] font-semibold text-[#D2A34E] sm:mt-0">
