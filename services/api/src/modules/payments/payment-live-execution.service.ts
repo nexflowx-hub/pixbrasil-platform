@@ -65,7 +65,7 @@ export class PaymentLiveExecutionService {
     if (!decrypted) {
       await this.failIntent(input.paymentIntentId, "CREDENTIALS_UNAVAILABLE");
       throw new ServiceUnavailableException(
-        "Selected provider credentials are unavailable.",
+        "PIX processing is temporarily unavailable.",
       );
     }
 
@@ -75,7 +75,7 @@ export class PaymentLiveExecutionService {
     } catch {
       await this.failIntent(input.paymentIntentId, "CREDENTIALS_MALFORMED");
       throw new ServiceUnavailableException(
-        "Selected provider credentials are malformed.",
+        "PIX processing is temporarily unavailable.",
       );
     }
 
@@ -123,10 +123,7 @@ export class PaymentLiveExecutionService {
     });
 
     if (execution.kind === "CREATED") {
-      const action = normalizeProviderAction(
-        input.providerCode,
-        execution.payload,
-      );
+      const action = normalizeProviderAction(execution.payload);
 
       await this.database.query(
         `
@@ -183,22 +180,11 @@ export class PaymentLiveExecutionService {
           currency: "BRL",
           reference: input.reference,
           store: input.store,
-          routing: {
-            mode: "LIVE",
-            policy: input.routing.policy,
-            policyVersion: input.routing.policyVersion,
-            providerCode: input.providerCode,
-            gatewayAlias: input.gatewayAlias,
-            releaseClass: input.routing.releaseClass,
-            crossReleaseClassFailover: false,
-          },
-          provider: {
-            paymentId: execution.providerPaymentId,
-            recovered: execution.recovered,
-          },
           action,
-          economics: input.economics,
-          release: input.release,
+          economics: merchantEconomics(input.economics),
+          release: {
+            class: input.routing.releaseClass,
+          },
         },
       };
     }
@@ -217,8 +203,8 @@ export class PaymentLiveExecutionService {
         `,
         [
           attempt.rows[0].id,
-          execution.code ?? "PROVIDER_REJECTED",
-          execution.message ?? "Provider rejected the payment.",
+          execution.code ?? "PAYMENT_REJECTED",
+          execution.message ?? "PIX payment was rejected.",
         ],
       );
       await this.failIntent(
@@ -226,7 +212,7 @@ export class PaymentLiveExecutionService {
         execution.code ?? "PROVIDER_REJECTED",
       );
       throw new UnprocessableEntityException(
-        execution.message ?? "Provider rejected the PIX payment.",
+        "PIX payment was rejected.",
       );
     }
 
@@ -246,7 +232,7 @@ export class PaymentLiveExecutionService {
       );
       await this.failIntent(input.paymentIntentId, execution.reason);
       throw new ServiceUnavailableException(
-        "Selected PIX provider is temporarily unavailable.",
+        "PIX processing is temporarily unavailable.",
       );
     }
 
@@ -286,17 +272,10 @@ export class PaymentLiveExecutionService {
         currency: "BRL",
         reference: input.reference,
         store: input.store,
-        routing: {
-          mode: "LIVE",
-          policy: input.routing.policy,
-          policyVersion: input.routing.policyVersion,
-          providerCode: input.providerCode,
-          gatewayAlias: input.gatewayAlias,
-          releaseClass: input.routing.releaseClass,
-          crossReleaseClassFailover: false,
+        economics: merchantEconomics(input.economics),
+        release: {
+          class: input.routing.releaseClass,
         },
-        economics: input.economics,
-        release: input.release,
       },
     };
   }
@@ -315,7 +294,7 @@ export class PaymentLiveExecutionService {
   }
 }
 
-function normalizeProviderAction(providerCode: string, payload: unknown) {
+function normalizeProviderAction(payload: unknown) {
   const root =
     payload && typeof payload === "object" && !Array.isArray(payload)
       ? (payload as Record<string, unknown>)
@@ -351,9 +330,17 @@ function normalizeProviderAction(providerCode: string, payload: unknown) {
 
   return {
     type: "PIX",
-    providerCode,
     ...(copyPaste ? { copyPaste } : {}),
     ...(qrCodeImage ? { qrCodeImage } : {}),
     ...(expiresAt ? { expiresAt } : {}),
+  };
+}
+
+
+function merchantEconomics(value: Record<string, unknown>) {
+  return {
+    grossBrl: Number(value.grossBrl ?? 0),
+    platformFeeBrl: Number(value.platformFeeBrl ?? 0),
+    estimatedMerchantNetBrl: Number(value.estimatedMerchantNetBrl ?? 0),
   };
 }
