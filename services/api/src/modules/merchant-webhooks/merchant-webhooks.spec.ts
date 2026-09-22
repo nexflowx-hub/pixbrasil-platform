@@ -6,9 +6,11 @@ test("merchant payment webhook is deduplicated after successful delivery", async
   const originalFetch = globalThis.fetch;
   let fetchCalls = 0;
   let deliveryInsertCalls = 0;
+  let firstDeliveryBody = "";
 
-  globalThis.fetch = (async () => {
+  globalThis.fetch = (async (_input, init) => {
     fetchCalls += 1;
+    if (!firstDeliveryBody) firstDeliveryBody = String(init?.body ?? "");
     return new Response("", { status: 200 });
   }) as typeof fetch;
 
@@ -81,6 +83,14 @@ test("merchant payment webhook is deduplicated after successful delivery", async
 
     assert.equal(fetchCalls, 1);
     assert.equal(deliveryInsertCalls, 2);
+
+    const delivered = JSON.parse(firstDeliveryBody) as {
+      data?: Record<string, unknown>;
+    };
+    const serialized = JSON.stringify(delivered);
+    assert.equal(serialized.includes("MISTICPAY"), false);
+    assert.equal(serialized.includes("provider-1"), false);
+    assert.equal(Object.hasOwn(delivered.data ?? {}, "provider"), false);
   } finally {
     globalThis.fetch = originalFetch;
   }
