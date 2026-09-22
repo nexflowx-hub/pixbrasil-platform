@@ -15,7 +15,7 @@ const node = "import { createHmac, timingSafeEqual } from \"node:crypto\";\n\nex
 
 const next = "export async function POST(request) {\n  const rawBody = await request.text();\n  verifyPixBrasilWebhook(rawBody, request.headers, process.env.PIXBRASIL_WEBHOOK_SECRET);\n\n  const event = JSON.parse(rawBody);\n  const deliveryId = request.headers.get(\"x-pixbrasil-delivery\");\n\n  // 1. dedupe by deliveryId in your DB\n  // 2. update the order idempotently\n  // 3. return 2xx quickly\n  // 4. queue analytics/postbacks after the response when possible\n\n  return Response.json({ received: true });\n}";
 
-const payload = "{\n  \"id\": \"delivery-uuid\",\n  \"type\": \"payment.succeeded\",\n  \"createdAt\": \"2026-09-19T...Z\",\n  \"data\": {\n    \"paymentIntentId\": \"uuid\",\n    \"reference\": \"ORDER-8472\",\n    \"amount\": 149.90,\n    \"currency\": \"BRL\",\n    \"status\": \"SUCCEEDED\",\n    \"store\": { \"code\": \"SIGNUM\" },\n    \"provider\": { \"code\": \"MISTICPAY\", \"paymentId\": \"...\" },\n    \"completedAt\": \"2026-09-19T...Z\",\n    \"metadata\": {\n      \"orderId\": \"8472\",\n      \"attribution\": { \"utm_source\": \"meta\" }\n    }\n  }\n}";
+const payload = "{\n  \"id\": \"delivery-uuid\",\n  \"type\": \"payment.succeeded\",\n  \"createdAt\": \"2026-09-19T...Z\",\n  \"data\": {\n    \"paymentIntentId\": \"uuid\",\n    \"reference\": \"ORDER-8472\",\n    \"amount\": 149.90,\n    \"currency\": \"BRL\",\n    \"status\": \"SUCCEEDED\",\n    \"store\": { \"code\": \"SIGNUM\" },\n    \"completedAt\": \"2026-09-19T...Z\",\n    \"metadata\": {\n      \"orderId\": \"8472\",\n      \"attribution\": { \"utm_source\": \"meta\" }\n    }\n  }\n}";
 
 export default function WebhooksDocsPage() {
   return (
@@ -27,7 +27,7 @@ export default function WebhooksDocsPage() {
       <DocsSection id="events" title="Eventos">
         <DocsGrid>
           <DocsCard title="payment.pending">Estado intermediário. Não entregue produto/serviço apenas com este evento.</DocsCard>
-          <DocsCard title="payment.succeeded" tone="green">Confirmação verificada pelo provider. Este é o evento normal para fulfillment.</DocsCard>
+          <DocsCard title="payment.succeeded" tone="green">Confirmação financeira verificada pelo PiXBrasil. Este é o evento normal para fulfillment.</DocsCard>
           <DocsCard title="payment.failed">Falha definitiva conhecida.</DocsCard>
           <DocsCard title="payment.canceled">Cancelamento ou estado equivalente confirmado.</DocsCard>
         </DocsGrid>
