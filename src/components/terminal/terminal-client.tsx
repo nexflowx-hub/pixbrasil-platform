@@ -2,7 +2,7 @@
 
 import {
   ArrowLeft,
-  Backspace,
+  Delete,
   Check,
   ChevronDown,
   Clipboard,
@@ -446,7 +446,7 @@ export function TerminalClient() {
                     className="terminal-key terminal-press flex h-[62px] items-center justify-center rounded-[16px] border border-white/10 text-[#A5C0B8]"
                     aria-label="Apagar"
                   >
-                    <Backspace className="h-5 w-5" />
+                    <Delete className="h-5 w-5" />
                   </button>
                 </div>
 
